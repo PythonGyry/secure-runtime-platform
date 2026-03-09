@@ -27,10 +27,21 @@ class BootstrapSettings:
 
         legacy_dir = root_dir.parent / "version_3_tkinter"
 
+        default_server = "http://127.0.0.1:8000"
+        if getattr(sys, "frozen", False):
+            meipass = getattr(sys, "_MEIPASS", None)
+            if meipass:
+                bundle_url_file = Path(meipass) / "bundle_server_url.txt"
+                if bundle_url_file.exists():
+                    try:
+                        default_server = bundle_url_file.read_text(encoding="utf-8").strip() or default_server
+                    except Exception:
+                        pass
+
         return cls(
             state_db_path=data_dir / "bootstrap_state.db",
             legacy_base_dir=legacy_dir,
             runtime_data_dir=data_dir,
-            default_server_base_url="http://127.0.0.1:8000",
+            default_server_base_url=default_server,
             default_channel="stable",
         )

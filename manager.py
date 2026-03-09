@@ -89,6 +89,15 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
     rm(PROJECT / "client" / "src" / "security" / "package_unwrap.c")
     rm(PROJECT / "shared" / "crypto" / "runtime_crypto.c")
+    # Розширення Cython: .pyd (Windows), .so (Linux)
+    for base, patterns in [
+        (PROJECT / "client" / "src" / "security", ["package_unwrap.*.pyd", "package_unwrap.*.so"]),
+        (PROJECT / "shared" / "crypto", ["runtime_crypto.*.pyd", "runtime_crypto.*.so"]),
+    ]:
+        if base.exists():
+            for pat in patterns:
+                for p in base.glob(pat):
+                    rm(p)
     rm(PROJECT / "build")
     rm(PROJECT / "dist")
     rm(PROJECT / "client" / "cache")
@@ -164,8 +173,29 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_cython_build() -> int:
+    """Зібрати Cython-розширення: на Windows — через .bat (MSYS2/MinGW), на Linux — gcc."""
+    if sys.platform == "win32":
+        r = subprocess.run(
+            ["cmd", "/c", "client\\build_cython_with_msys2.bat"],
+            cwd=PROJECT,
+        )
+    else:
+        r = subprocess.run(
+            [sys.executable, str(PROJECT / "client" / "cython_prebuild_cleanup.py")],
+            cwd=PROJECT,
+        )
+        if r.returncode != 0:
+            return r.returncode
+        r = subprocess.run(
+            [sys.executable, "setup_cython_bootstrap.py", "build_ext", "--inplace"],
+            cwd=PROJECT,
+        )
+    return r.returncode
+
+
 def cmd_client(args: argparse.Namespace) -> int:
-    """Зібрати bootstrap exe. -a app — іконка з apps/<app>/icon.ico, ім'я за замовчуванням {app}_bootstrap."""
+    """Зібрати bootstrap exe (Windows) або бінар (Linux). -a app — іконка з apps/<app>/icon.ico, ім'я за замовчуванням {app}_bootstrap."""
     app_raw = getattr(args, "app", None)
     app = app_raw[0] if isinstance(app_raw, list) and app_raw else (app_raw if isinstance(app_raw, str) else None)
     name = getattr(args, "name", None)
@@ -175,20 +205,23 @@ def cmd_client(args: argparse.Namespace) -> int:
         exe_name = (name or "bootstrap").strip() or "bootstrap"
 
     print("Building Cython extensions...")
-    r = subprocess.run(["cmd", "/c", "client\\build_cython_with_msys2.bat"], cwd=PROJECT)
-    if r.returncode != 0:
+    if _run_cython_build() != 0:
         print("ERROR: Cython build failed. Fix the error above and retry. Build aborted.")
         return 1
 
-    print(f"Building bootstrap exe ({exe_name})...")
+    print(f"Building bootstrap {'exe' if sys.platform == 'win32' else 'binary'} ({exe_name})...")
     cmd = [sys.executable, "client/build_client_exe.py", "--name", exe_name]
     if app:
         cmd.extend(["--app", app])
+    server_url = getattr(args, "server_url", None)
+    if server_url and str(server_url).strip():
+        cmd.extend(["--server-url", str(server_url).strip()])
     r = subprocess.run(cmd, cwd=PROJECT)
     if r.returncode != 0:
         return r.returncode
 
-    print(f"Done. Client -> dist/{exe_name}.exe")
+    out_name = f"{exe_name}.exe" if sys.platform == "win32" else exe_name
+    print(f"Done. Client -> dist/{out_name}")
     return 0
 
 
@@ -299,6 +332,41 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_deploy(args: argparse.Namespace) -> int:
+    """Зібрати (опціонально) та вигрузити пакети на Linux-сервер. Запускати з Windows (збірка) або будь-де (тільки вигрузка)."""
+    deploy_script = PROJECT / "scripts" / "deploy_to_server.py"
+    if not deploy_script.exists():
+        print(f"Script not found: {deploy_script}", file=sys.stderr)
+        return 1
+    cmd = [sys.executable, str(deploy_script)]
+    if getattr(args, "host", None):
+        cmd.extend(["--host", args.host])
+    if getattr(args, "user", None):
+        cmd.extend(["--user", args.user])
+    if getattr(args, "path", None):
+        cmd.extend(["--path", args.path])
+    if getattr(args, "key", None):
+        cmd.extend(["--key", args.key])
+    if getattr(args, "password", None):
+        cmd.extend(["--password", args.password])
+    if getattr(args, "build", False):
+        cmd.append("--build")
+    if getattr(args, "build_client", False):
+        cmd.append("--build-client")
+    if getattr(args, "server_url", None):
+        cmd.extend(["--server-url", args.server_url])
+    if getattr(args, "app", None):
+        cmd.extend(["--app", args.app])
+    if getattr(args, "version", None):
+        cmd.extend(["--version", args.version])
+    if getattr(args, "client_name", None):
+        cmd.extend(["--client-name", args.client_name])
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    r = subprocess.run(cmd, cwd=PROJECT)
+    return r.returncode
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Менеджер платформи: збірка, очистка, адміністрування (app = назва папки в runtime_logic/apps/)",
@@ -329,9 +397,10 @@ def main() -> int:
     p_build.set_defaults(func=cmd_build)
 
     # client
-    p_client = subparsers.add_parser("client", help="Зібрати bootstrap exe")
+    p_client = subparsers.add_parser("client", help="Зібрати bootstrap exe (Windows) або бінар (Linux)")
     p_client.add_argument("--app", "-a", help="Апка (напр. wishlist) — іконка з apps/<app>/icon.ico, ім'я: <app>_bootstrap")
     p_client.add_argument("--name", "-n", help="Ім'я exe (override). Напр. 'NBU Coins Monitor'")
+    p_client.add_argument("--server-url", "-s", help="URL сервера для клієнта (вшивається в exe — для підключення до Linux-сервера)")
     p_client.set_defaults(func=cmd_client)
 
     # full
@@ -356,6 +425,22 @@ def main() -> int:
     # run
     p_run = subparsers.add_parser("run", help="Запустити backend сервер")
     p_run.set_defaults(func=cmd_run)
+
+    # deploy (збірка на Windows + вигрузка пакетів на Linux)
+    p_deploy = subparsers.add_parser("deploy", help="Вигрузити пакети на Linux-сервер (опціонально: спочатку зібрати та зібрати exe)")
+    p_deploy.add_argument("--host", "-H", help="Хост сервера")
+    p_deploy.add_argument("--user", "-u", help="SSH користувач")
+    p_deploy.add_argument("--path", "-p", help="Шлях до проекту на сервері")
+    p_deploy.add_argument("--key", "-k", help="Шлях до SSH-ключа")
+    p_deploy.add_argument("--password", help="Пароль SSH (краще DEPLOY_PASSWORD)")
+    p_deploy.add_argument("--build", "-b", action="store_true", help="Спочатку зібрати пакети (manager build)")
+    p_deploy.add_argument("--build-client", action="store_true", help="Зібрати .exe з --server-url")
+    p_deploy.add_argument("--server-url", "-s", help="URL сервера для клієнта (напр. https://your-server.com)")
+    p_deploy.add_argument("--app", "-a", default="wishlist", help="App для build/build-client")
+    p_deploy.add_argument("--version", "-v", default="1.0.0", help="Версія для build")
+    p_deploy.add_argument("--client-name", "-n", help="Ім'я exe клієнта")
+    p_deploy.add_argument("--dry-run", action="store_true", help="Тільки показати дії")
+    p_deploy.set_defaults(func=cmd_deploy)
 
     parsed = parser.parse_args()
     if not parsed.command:

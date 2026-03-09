@@ -1,5 +1,7 @@
 """
-Видаляє/перейменовує старі .pyd перед збіркою Cython, щоб уникнути 'Access is denied'.
+Видаляє/перейменовує старі розширення Cython перед збіркою:
+- Windows: .pyd (уникнення 'Access is denied')
+- Linux (та ін.): .so
 Якщо файл заблокований — спочатку перейменовує в .old (на Windows часто працює).
 """
 from __future__ import annotations
@@ -12,11 +14,16 @@ TARGETS = [
     PROJECT / "client" / "src" / "security",
     PROJECT / "shared" / "crypto",
 ]
-PATTERNS = ["package_unwrap.*.pyd", "runtime_crypto.*.pyd"]
-OLD_PATTERNS = ["package_unwrap.*.pyd.old", "runtime_crypto.*.pyd.old"]
+# Windows: .pyd; Linux/ін.: .so (Cython build_ext --inplace)
+if sys.platform == "win32":
+    PATTERNS = ["package_unwrap.*.pyd", "runtime_crypto.*.pyd"]
+    OLD_PATTERNS = ["package_unwrap.*.pyd.old", "runtime_crypto.*.pyd.old"]
+else:
+    PATTERNS = ["package_unwrap.*.so", "runtime_crypto.*.so"]
+    OLD_PATTERNS = ["package_unwrap.*.so.old", "runtime_crypto.*.so.old"]
 
 
-def _clear_pyd(p: Path) -> bool:
+def _clear_ext(p: Path) -> bool:
     """Повертає True якщо файл прибрано (видалено або перейменовано)."""
     try:
         p.unlink()
@@ -38,7 +45,7 @@ def _clear_pyd(p: Path) -> bool:
 
 
 def main() -> int:
-    # Спочатку видалити старі .pyd.old (зазвичай не заблоковані)
+    # Спочатку видалити старі *.old (зазвичай не заблоковані)
     for base in TARGETS:
         if not base.exists():
             continue
@@ -54,12 +61,13 @@ def main() -> int:
             continue
         for pat in PATTERNS:
             for p in base.glob(pat):
-                if _clear_pyd(p):
+                if _clear_ext(p):
                     cleared.append(str(p))
                 else:
                     return 1
     if cleared:
-        print("Cleared old .pyd:", ", ".join(cleared))
+        ext = "pyd" if sys.platform == "win32" else "so"
+        print("Cleared old ." + ext + ":", ", ".join(cleared))
     return 0
 
 

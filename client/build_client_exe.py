@@ -16,6 +16,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Збірка bootstrap exe")
     parser.add_argument("--name", "-n", default="bootstrap", help="Ім'я exe без .exe")
     parser.add_argument("--app", "-a", help="Апка — іконка з runtime_logic/apps/<app>/icon.ico")
+    parser.add_argument("--server-url", "-s", help="URL сервера для клієнта (вшивається в exe, напр. https://my.server.com)")
     args = parser.parse_args()
     exe_name = (args.name or "bootstrap").strip() or "bootstrap"
 
@@ -27,7 +28,15 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    # Видалення старих .pyd перед збіркою (уникнення "Access is denied")
+    # URL сервера для зібраного exe (опціонально) — читається в bootstrap_settings при frozen
+    server_url = getattr(args, "server_url", None) or ""
+    bundle_url_file = project_root / "client" / "bundle_server_url.txt"
+    if server_url and server_url.strip():
+        bundle_url_file.write_text(server_url.strip(), encoding="utf-8")
+    elif bundle_url_file.exists():
+        bundle_url_file.unlink()
+
+    # Видалення старих Cython-розширень (.pyd / .so) перед збіркою
     r_clean = subprocess.run(
         [sys.executable, str(project_root / "client" / "cython_prebuild_cleanup.py")],
         cwd=project_root,

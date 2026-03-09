@@ -2,11 +2,11 @@
 Build Cython extensions for bootstrap (package_unwrap, runtime_crypto).
 Run from project root: python setup_cython_bootstrap.py build_ext --inplace
 
-Requires: pip install cython, and one of:
-  - Microsoft C++ Build Tools (MSVC)
-  - MSYS2 + MinGW: pacman -S mingw-w64-x86_64-gcc
-    Then: client\\build_cython_with_msys2.bat
-If build fails, bootstrap uses .py sources (XOR obfuscation + double encryption).
+Requires: pip install cython, and a C compiler:
+  - Linux: gcc (apt install build-essential / yum groupinstall "Development Tools")
+  - macOS: Xcode Command Line Tools (xcode-select --install)
+  - Windows: Microsoft C++ Build Tools (MSVC) or MSYS2 + MinGW (client\\build_cython_with_msys2.bat)
+If build fails, bootstrap falls back to .py sources (XOR obfuscation + double encryption).
 """
 from __future__ import annotations
 

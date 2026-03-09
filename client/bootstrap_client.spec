@@ -24,11 +24,17 @@ else:
     if not verified_ico.exists():
         verified_ico = (project_root / "runtime_logic" / "apps" / "wishlist" / "icon.ico").resolve()
 
+# Дані для exe: іконка + опціонально bundle_server_url.txt (--server-url при збірці)
+_extra_datas = [(str(verified_ico), "icons")] if verified_ico.exists() else []
+_bundle_url = project_root / "client" / "bundle_server_url.txt"
+if _bundle_url.exists():
+    _extra_datas.append((str(_bundle_url), "."))
+
 a = Analysis(
     [str(client_entry)],
     pathex=[str(project_root)],
     binaries=[],
-    datas=[(str(verified_ico), "icons")] if verified_ico.exists() else [],
+    datas=_extra_datas,
     hiddenimports=[
         "requests",
         "urllib3",

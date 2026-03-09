@@ -1,0 +1,8 @@
+{
+  "host": "your-server.com",
+  "user": "root",
+  "path": "/path/to/secure-runtime-platform",
+  "key_path": "",
+  "password": "",
+  "server_url": "https://your-server.com"
+}

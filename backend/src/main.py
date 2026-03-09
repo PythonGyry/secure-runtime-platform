@@ -99,7 +99,13 @@ app = FastAPI(title="Secure Runtime Platform Backend")
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+# Для продакшну додайте свій домен до allow_origins або змініть на конфіг з БД
+    allow_origins=[
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "https://your-server.com",
+        "http://your-server.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

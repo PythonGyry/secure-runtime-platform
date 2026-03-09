@@ -17,6 +17,8 @@ dist/
 
 # Cython
 *.c
+*.pyd
+*.so
 
 # Runtime / packages
 .runtime_data/
@@ -30,6 +32,14 @@ backend/data/signing_keypair.json
 backend/data/db/
 backend/data/backups/
 runtime_logic/apps/*/
+deploy_config.json
+client/bundle_server_url.txt
+.env
+.env.*
+!.env.example
+
+# Deploy (критично не комітити — серверний конфіг)
+deploy/nginx-secure-runtime-platform.conf
 
 # IDE / OS
 .idea/
