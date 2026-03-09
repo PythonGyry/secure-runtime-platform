@@ -342,7 +342,9 @@ def build_router(container) -> APIRouter:
     @admin_router.get("/apps")
     def admin_list_apps(authorization: str | None = Header(default=None)) -> dict:
         _require_admin(container, authorization)
-        apps = container.package_repository.list_apps()
+        from_db = container.package_repository.list_apps()
+        from_packages = container.package_repository.list_apps_from_packages_dir()
+        apps = sorted(set(from_db) | set(from_packages))
         return {"items": apps}
 
     @admin_router.get("/releases")
