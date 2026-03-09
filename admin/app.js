@@ -297,6 +297,9 @@ function updateAppVersionDropdown() {
   const valueEl = document.getElementById("app-version-value");
   if (!panel || !valueEl) return;
   const releases = state.releases || [];
+  const appsFromApi = state.apps || [];
+  const appsFromReleases = [...new Set(releases.map((r) => r.app).filter(Boolean))];
+  const allApps = [...new Set([...appsFromApi, ...appsFromReleases])].sort();
   const pairs = [];
   const seen = new Set();
   for (const r of releases) {
@@ -308,9 +311,13 @@ function updateAppVersionDropdown() {
       pairs.push({ app, channel: ch });
     }
   }
+  if (!pairs.length && allApps.length) {
+    for (const app of allApps) {
+      pairs.push({ app, channel: "stable" });
+    }
+  }
   if (!pairs.length) {
-    const firstApp = (state.apps || [])[0];
-    pairs.push({ app: firstApp || "wishlist", channel: "stable" });
+    pairs.push({ app: allApps[0] || "wishlist", channel: "stable" });
   }
   const selected = getSelectedAppChannels();
   panel.innerHTML = pairs
@@ -437,8 +444,10 @@ function initKeysStatusDropdown() {
 }
 
 function getReleasesTabOptions() {
-  const apps = state.apps || [];
+  const appsFromApi = state.apps || [];
   const releases = state.releases || [];
+  const appsFromReleases = [...new Set(releases.map((r) => r.app).filter(Boolean))];
+  const apps = [...new Set([...appsFromApi, ...appsFromReleases])].sort();
   const channels = [...new Set(releases.map((r) => r.channel).filter(Boolean))];
   const tabs = [{ app: "", channel: "", label: "All" }];
   for (const app of apps) {
@@ -540,7 +549,8 @@ document.getElementById("license-form").addEventListener("submit", async (event)
     }
   }
   const appChannelAccess = getSelectedAppChannels();
-  const channelAccess = Object.keys(appChannelAccess).length ? appChannelAccess : { wishlist: ["stable"] };
+  const defaultApp = (state.apps || [])[0] || (state.releases || [])[0]?.app || "wishlist";
+  const channelAccess = Object.keys(appChannelAccess).length ? appChannelAccess : { [defaultApp]: ["stable"] };
   const payload = {
     display_name: document.getElementById("license-display-name").value.trim(),
     channel_access: channelAccess,

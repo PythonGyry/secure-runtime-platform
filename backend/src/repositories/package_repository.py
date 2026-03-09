@@ -81,11 +81,26 @@ class PackageRepository:
         return [dict(row) for row in rows]
 
     def list_apps(self) -> list[str]:
+        """Список app з БД (релізи)."""
         with self.database.connect() as connection:
             rows = connection.execute(
                 "SELECT DISTINCT app FROM runtime_releases ORDER BY app"
             ).fetchall()
         return [row["app"] for row in rows]
+
+    def list_apps_from_packages_dir(self) -> list[str]:
+        """Список app з маніфестів у backend/packages/*.json (без залежності від sync)."""
+        apps: set[str] = set()
+        if not self.packages_dir.exists():
+            return []
+        for manifest_path in self.packages_dir.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                app = manifest.get("app") or "wishlist"
+                apps.add(app)
+            except Exception:
+                continue
+        return sorted(apps)
 
     def upsert_release(
         self,
