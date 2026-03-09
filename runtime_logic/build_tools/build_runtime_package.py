@@ -25,6 +25,7 @@ def build_package(app: str, version: str, channel: str) -> None:
         raise FileNotFoundError(f"App not found: {app} (expected {app_dir})")
     source_root = app_dir / "src"
     shared_root = project_root / "shared"
+    apps_shared_dir = project_root / "runtime_logic" / "apps"
     dist_root = project_root / "runtime_logic" / "dist"
     backend_packages = project_root / "backend" / "packages"
 
@@ -36,6 +37,10 @@ def build_package(app: str, version: str, channel: str) -> None:
 
     compileall.compile_dir(source_root, force=True, quiet=1, legacy=True)
     compileall.compile_dir(shared_root, force=True, quiet=1, legacy=True)
+    # Спільні модулі в runtime_logic/apps/ (наприклад shared_log_service.py)
+    for py_file in apps_shared_dir.iterdir():
+        if py_file.suffix == ".py" and py_file.is_file():
+            compileall.compile_file(str(py_file), force=True, quiet=1, legacy=True)
 
     init_content = b""
     package_dirs = set()
@@ -45,6 +50,8 @@ def build_package(app: str, version: str, channel: str) -> None:
             rel = parent.relative_to(project_root)
             for i in range(len(rel.parts)):
                 package_dirs.add(project_root / Path(*rel.parts[: i + 1]))
+    package_dirs.add(project_root / "runtime_logic")
+    package_dirs.add(project_root / "runtime_logic" / "apps")
 
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for pkg_dir in sorted(package_dirs):
@@ -64,6 +71,18 @@ def build_package(app: str, version: str, channel: str) -> None:
                         archive.write(pyc_path, arcname)
                         pyc_path.unlink(missing_ok=True)
                         break
+        # Додати .pyc спільних модулів з runtime_logic/apps/
+        for py_path in apps_shared_dir.iterdir():
+            if py_path.suffix != ".py" or not py_path.is_file():
+                continue
+            mod_name = py_path.stem
+            for pyc_name in (f"{mod_name}.{CACHE_TAG}.pyc", f"{mod_name}.pyc"):
+                pyc_path = py_path.parent / pyc_name
+                if pyc_path.exists():
+                    arcname = str(pyc_path.relative_to(project_root))
+                    archive.write(pyc_path, arcname)
+                    pyc_path.unlink(missing_ok=True)
+                    break
 
     package_bytes = archive_path.read_bytes()
     module_name = f"runtime_logic.apps.{app}.src.entrypoints.runtime_entry"
