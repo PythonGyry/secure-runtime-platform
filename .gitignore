@@ -25,6 +25,7 @@ dist/
 client/cache/
 runtime_logic/dist/
 backend/packages/
+**/.dev_data/
 
 # Sensitive (never commit)
 backend/data/admin_bootstrap.json

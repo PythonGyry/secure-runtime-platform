@@ -154,6 +154,40 @@ key = derive_fernet_key(
 
 ---
 
+## 3.1. Спільний логер (runtime_logic/apps) і debug-режим
+
+У корені `runtime_logic/apps/` лежить **shared_log_service.py** — спільний сервіс логів для всіх апок. Він пише в БД через передану функцію `append_log` (наприклад `storage.append_log`) або **у консоль у debug-режимі**, без дублювання коду.
+
+- **Використання в апці:** імпортуй і використовуй `SharedLogService` з `runtime_logic.apps.shared_log_service` або тонку обгортку на кшталт wishlist: `LogService(storage, context_payload=context_payload)` з `runtime_logic.apps.<app_id>.src.app.services.log_service`.
+- **Debug-режим (логи в консоль замість БД):**
+  - Встанови змінну середовища **`RUNTIME_DEBUG=1`** (або `true`/`yes`) перед запуском runtime, або
+  - Передай у **`context_payload["debug"] = True`** при виклику `run_runtime` (якщо клієнт/платформа це підтримує).
+
+У debug-режимі виклики `log` / `log_with_details` виводяться в stdout (консоль), запис у БД не виконується. Це зручно для розробки та діагностики.
+
+### Запуск будь-якої апки в debug-режимі (універсальний скрипт)
+
+З кореня проєкту можна запустити **будь-яку** апку з `runtime_logic/apps/` у debug-режимі, передавши її **ID** (назву папки):
+
+```bash
+# Запустити апку wishlist (логи в консоль, дані в runtime_logic/apps/wishlist/.dev_data/)
+python scripts/run_app_debug.py wishlist
+
+# Те саме, з явним аргументом
+python scripts/run_app_debug.py -a wishlist
+python scripts/run_app_debug.py --app my_tool
+
+# Показати список доступних апок
+python scripts/run_app_debug.py --list
+```
+
+- Скрипт **`scripts/run_app_debug.py`** приймає один аргумент — **ID апки** (наприклад `wishlist`, `my_tool`).
+- У контекст передається `debug: True`, тому логи йдуть у консоль, а не в БД.
+- Дані зберігаються локально в папці **`runtime_logic/apps/<app_id>/.dev_data/`** (ця папка в `.gitignore`).
+- Сервер за замовчуванням: `https://secure-runtime-platform.duckdns.org`. Своїй URL можна задати змінною середовища **`RUNTIME_SERVER_URL`**.
+
+---
+
 ## 4. Збірка апки та поява в платформі
 
 1. Поклади код апки в `runtime_logic/apps/<app_id>/` з обов’язковим `src/entrypoints/runtime_entry.py` і функцією `run_runtime(context_payload)`.
@@ -207,9 +241,10 @@ key = derive_fernet_key(
 
 1. Створити папку `runtime_logic/apps/<app_id>/` з `src/entrypoints/runtime_entry.py` і функцією `run_runtime(context_payload)`.
 2. Використовувати в апці лише імпорти з `shared.*` та `runtime_logic.apps.<app_id>.*`.
-3. Зібрати пакет: `python manager.py build -a <app_id> -v 1.0.0 -c stable`.
-4. У адмін-панелі для потрібних ліцензій у `channel_access` додати `<app_id>: ["stable"]` (або інші канали).
-5. За потреби зібрати клієнт з іконкою апки: `python manager.py client -a <app_id> -n MyAppBootstrap`.
+3. **Локальний запуск у debug-режимі:** `python scripts/run_app_debug.py <app_id>` (логи в консоль, дані в `.dev_data/`).
+4. Зібрати пакет: `python manager.py build -a <app_id> -v 1.0.0 -c stable`.
+5. У адмін-панелі для потрібних ліцензій у `channel_access` додати `<app_id>: ["stable"]` (або інші канали).
+6. За потреби зібрати клієнт з іконкою апки: `python manager.py client -a <app_id> -n MyAppBootstrap`.
 
 Після цього користувач з відповідним ключем зможе запускати твою апку через той самий bootstrap (або окремий exe, зібраний з `-a <app_id>`).
 
