@@ -95,7 +95,7 @@ class Container:
 
 
 container = Container()
-app = FastAPI(title="Wishlist Platform Backend")
+app = FastAPI(title="Secure Runtime Platform Backend")
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,

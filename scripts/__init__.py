@@ -1,1 +1,1 @@
-# Wishlist platform scripts
+# Secure Runtime Platform scripts
