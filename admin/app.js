@@ -89,6 +89,42 @@ function formatChannelAccess(ca) {
     .join("; ");
 }
 
+function formatVersionPins(vp) {
+  if (!vp || typeof vp !== "object") return "—";
+  const entries = Object.entries(vp).filter(([, v]) => v);
+  if (!entries.length) return "Найновіша";
+  return entries.map(([app, ver]) => `${app}: ${ver}`).join("; ");
+}
+
+function getVersionPinsFromForm() {
+  const container = document.getElementById("license-version-pins");
+  if (!container) return {};
+  const out = {};
+  container.querySelectorAll("[data-version-pin-app]").forEach((sel) => {
+    const app = sel.dataset.versionPinApp;
+    const val = sel.value;
+    if (app && val) out[app] = val;
+  });
+  return out;
+}
+
+function buildVersionCellHTML(item) {
+  const releases = state.releases || [];
+  const ca = item.channel_access || {};
+  const pins = item.version_pins || {};
+  const apps = Object.keys(ca);
+  if (!apps.length) return '<span class="muted">—</span>';
+  let html = `<div class="version-pins-inline" data-license-id="${item.license_id}">`;
+  apps.forEach((app) => {
+    const versions = [...new Set(releases.filter((r) => (r.app || "wishlist") === app).map((r) => r.version).filter(Boolean))].sort();
+    const cur = pins[app] || "";
+    const opts = '<option value="">Найновіша</option>' + versions.map((v) => `<option value="${escapeAttr(v)}" ${v === cur ? "selected" : ""}>${escapeAttr(v)}</option>`).join("");
+    html += `<select data-edit-pin-app="${escapeAttr(app)}" class="version-pin-select">${opts}</select>`;
+  });
+  html += "</div>";
+  return html;
+}
+
 function renderLicenses(items) {
   const appFilter = state.licensesAppFilter || "";
   let filtered = items;
@@ -103,6 +139,7 @@ function renderLicenses(items) {
   const rows = filtered.map((item) => ({
     ...item,
     caStr: formatChannelAccess(item.channel_access),
+    versionPinsStr: formatVersionPins(item.version_pins),
   }));
   licensesTable.innerHTML = rows.map((item) => `
     <tr>
@@ -111,6 +148,9 @@ function renderLicenses(items) {
       <td>${item.display_name}</td>
       <td>${item.status}</td>
       <td>${item.caStr}</td>
+      <td class="license-version-cell">
+        ${buildVersionCellHTML(item)}
+      </td>
       <td>${item.bound_hwid || ""}</td>
       <td>
         <div class="inline-actions">
@@ -133,6 +173,7 @@ function renderLicenses(items) {
         <div class="card-row"><span class="card-label">Name</span><span class="card-value">${item.display_name}</span></div>
         <div class="card-row"><span class="card-label">Status</span><span class="card-value">${item.status}</span></div>
         <div class="card-row"><span class="card-label">Access</span><span class="card-value">${item.caStr}</span></div>
+        <div class="card-row card-row-version"><span class="card-label">Версія</span><div class="card-value card-value-version">${buildVersionCellHTML(item)}</div></div>
         <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.bound_hwid || "—"}</span></div>
         <div class="card-actions inline-actions">
           <button data-action="toggle-license" data-id="${item.license_id}" data-status="${item.status}">${item.status === "active" ? "Disable" : "Enable"}</button>
@@ -331,16 +372,37 @@ function updateAppVersionDropdown() {
   const label = Object.entries(sel)
     .map(([a, chs]) => `${a}: ${chs.join(", ")}`)
     .join("; ");
-  valueEl.textContent = label || "Обрати програму та версію";
+  valueEl.textContent = label || "Обрати програму та канал";
   valueEl.classList.toggle("empty", !label);
   panel.querySelectorAll("input").forEach((cb) => {
     cb.addEventListener("change", () => {
       const s = getSelectedAppChannels();
       const l = Object.entries(s).map(([a, chs]) => `${a}: ${chs.join(", ")}`).join("; ");
-      valueEl.textContent = l || "Обрати програму та версію";
+      valueEl.textContent = l || "Обрати програму та канал";
       valueEl.classList.toggle("empty", !l);
+      updateLicenseVersionPinsUI();
     });
   });
+  updateLicenseVersionPinsUI();
+}
+
+function updateLicenseVersionPinsUI() {
+  const row = document.getElementById("license-version-pins-row");
+  const container = document.getElementById("license-version-pins");
+  if (!row || !container) return;
+  const sel = getSelectedAppChannels();
+  const apps = Object.keys(sel);
+  if (!apps.length) {
+    row.style.display = "none";
+    return;
+  }
+  row.style.display = "block";
+  const releases = state.releases || [];
+  container.innerHTML = apps.map((app) => {
+    const versions = [...new Set(releases.filter((r) => (r.app || "wishlist") === app).map((r) => r.version).filter(Boolean))].sort();
+    const opts = '<option value="">Найновіша</option>' + versions.map((v) => `<option value="${escapeAttr(v)}">${escapeAttr(v)}</option>`).join("");
+    return `<label class="version-pin-label"><span>${escapeAttr(app)}:</span> <select data-version-pin-app="${escapeAttr(app)}" class="field-input">${opts}</select></label>`;
+  }).join("");
 }
 
 function updateReleasesTabs() {
@@ -540,6 +602,8 @@ document.getElementById("license-expires-wrapper").addEventListener("click", () 
 
 document.getElementById("license-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const errEl = document.getElementById("license-form-error");
+  if (errEl) errEl.style.display = "none";
   const noExpiry = document.getElementById("license-no-expiry").checked;
   let expiresAt = null;
   if (!noExpiry) {
@@ -549,11 +613,18 @@ document.getElementById("license-form").addEventListener("submit", async (event)
     }
   }
   const appChannelAccess = getSelectedAppChannels();
-  const defaultApp = (state.apps || [])[0] || (state.releases || [])[0]?.app || "wishlist";
-  const channelAccess = Object.keys(appChannelAccess).length ? appChannelAccess : { [defaultApp]: ["stable"] };
+  const channelAccess = appChannelAccess;
+  if (!Object.keys(channelAccess).length) {
+    if (errEl) {
+      errEl.textContent = "Оберіть хоча б одну програму та канал (App + Version).";
+      errEl.style.display = "block";
+    }
+    return;
+  }
   const payload = {
     display_name: document.getElementById("license-display-name").value.trim(),
     channel_access: channelAccess,
+    version_pins: getVersionPinsFromForm(),
     expires_at: expiresAt,
     notes: document.getElementById("license-notes").value.trim(),
   };
@@ -581,6 +652,27 @@ document.getElementById("generate-key").addEventListener("click", async () => {
 document.getElementById("sync-releases").addEventListener("click", async () => {
   await api("/api/admin/releases/sync", { method: "POST" });
   await refreshAll();
+});
+
+document.body.addEventListener("change", async (event) => {
+  const select = event.target;
+  if (select.matches && select.matches("select[data-edit-pin-app]")) {
+    const wrapper = select.closest(".version-pins-inline[data-license-id]");
+    if (!wrapper) return;
+    const licenseId = wrapper.dataset.licenseId;
+    if (!licenseId) return;
+    const versionPins = {};
+    wrapper.querySelectorAll("select[data-edit-pin-app]").forEach((sel) => {
+      const app = sel.dataset.editPinApp;
+      const val = sel.value;
+      if (app && val) versionPins[app] = val;
+    });
+    await api(`/api/admin/licenses/${licenseId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ version_pins: versionPins }),
+    });
+    await refreshAll();
+  }
 });
 
 document.body.addEventListener("click", async (event) => {

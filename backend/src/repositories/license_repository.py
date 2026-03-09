@@ -62,6 +62,7 @@ class LicenseRepository:
         display_name: str,
         created_by: str,
         channel_access: Iterable[str] | dict[str, list[str]],
+        version_pins: dict[str, str] | None = None,
         expires_at: str | None = None,
         notes: str = "",
         status: str = "active",
@@ -71,12 +72,14 @@ class LicenseRepository:
             channel_access_json = json.dumps(channel_access)
         else:
             channel_access_json = json.dumps(sorted(set(channel_access)) or ["stable"])
+        version_pins_json = json.dumps(version_pins if isinstance(version_pins, dict) else {})
         payload = (
             license_key,
             hash_license_key(license_key),
             display_name,
             status,
             channel_access_json,
+            version_pins_json,
             expires_at,
             notes,
             created_by,
@@ -92,13 +95,14 @@ class LicenseRepository:
                     display_name,
                     status,
                     channel_access,
+                    version_pins,
                     expires_at,
                     notes,
                     created_by,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 payload,
             )
@@ -144,6 +148,8 @@ class LicenseRepository:
                     value = json.dumps(value)
                 elif isinstance(value, (list, tuple, set)):
                     value = json.dumps(sorted(set(value)) or ["stable"])
+            elif key == "version_pins" and isinstance(value, dict):
+                value = json.dumps(value)
             assignments.append(f"{key} = ?")
             params.append(value)
         assignments.append("updated_at = ?")
@@ -218,4 +224,8 @@ class LicenseRepository:
             payload["channel_access"] = json.loads(payload.get("channel_access", "[]"))
         except json.JSONDecodeError:
             payload["channel_access"] = ["stable"]
+        try:
+            payload["version_pins"] = json.loads(payload.get("version_pins", "{}"))
+        except json.JSONDecodeError:
+            payload["version_pins"] = {}
         return payload

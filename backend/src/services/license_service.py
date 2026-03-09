@@ -16,18 +16,22 @@ class LicenseService:
         display_name: str,
         created_by: str,
         channel_access: list[str] | dict[str, list[str]] | None = None,
+        version_pins: dict[str, str] | None = None,
         expires_at: str | None = None,
         notes: str = "",
     ) -> dict:
         if channel_access is None:
-            channel_access = {"wishlist": ["stable"]}
+            channel_access = {}
         elif isinstance(channel_access, list):
-            channel_access = {"wishlist": channel_access} if channel_access else {"wishlist": ["stable"]}
+            channel_access = {"wishlist": channel_access} if channel_access else {}
+        if not channel_access:
+            raise ValueError("channel_access не може бути порожнім")
         return self.repository.create_managed_license(
             license_key=self._generate_license_key(),
             display_name=display_name,
             created_by=created_by,
             channel_access=channel_access,
+            version_pins=version_pins or {},
             expires_at=expires_at,
             notes=notes,
         )
@@ -78,11 +82,15 @@ class LicenseService:
             ca = {"wishlist": ["stable"]}
         elif isinstance(ca, list):
             ca = {"wishlist": ca} if ca else {"wishlist": ["stable"]}
+        version_pins = record.get("version_pins") or {}
+        if not isinstance(version_pins, dict):
+            version_pins = {}
         return self.repository.create_managed_license(
             license_key=self._generate_license_key(),
             display_name=record["display_name"],
             created_by=updated_by,
             channel_access=ca,
+            version_pins=version_pins,
             expires_at=record.get("expires_at"),
             notes=record.get("notes", ""),
             status=record.get("status", "active"),

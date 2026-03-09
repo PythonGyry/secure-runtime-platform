@@ -43,23 +43,24 @@ class Database:
                 """
             )
             connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS managed_licenses (
-                    license_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    license_key TEXT NOT NULL UNIQUE,
-                    license_key_hash TEXT NOT NULL UNIQUE,
-                    display_name TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    bound_hwid TEXT,
-                    channel_access TEXT NOT NULL,
-                    expires_at TEXT,
-                    notes TEXT,
-                    created_by TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    last_used_at TEXT
-                )
-                """
+            """
+            CREATE TABLE IF NOT EXISTS managed_licenses (
+                license_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                license_key TEXT NOT NULL UNIQUE,
+                license_key_hash TEXT NOT NULL UNIQUE,
+                display_name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                bound_hwid TEXT,
+                channel_access TEXT NOT NULL,
+                version_pins TEXT NOT NULL DEFAULT '{}',
+                expires_at TEXT,
+                notes TEXT,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_used_at TEXT
+            )
+            """
             )
             connection.execute(
                 """
@@ -150,7 +151,15 @@ class Database:
                 """
             )
             self._seed_server_config(connection)
+            self._migrate_managed_licenses_version_pins(connection)
             connection.commit()
+
+    def _migrate_managed_licenses_version_pins(self, connection: sqlite3.Connection) -> None:
+        cursor = connection.execute("PRAGMA table_info(managed_licenses)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "version_pins" in columns:
+            return
+        connection.execute("ALTER TABLE managed_licenses ADD COLUMN version_pins TEXT NOT NULL DEFAULT '{}'")
 
     def _migrate_download_tokens_add_app(self, connection: sqlite3.Connection) -> None:
         cursor = connection.execute("PRAGMA table_info(managed_download_tokens)")

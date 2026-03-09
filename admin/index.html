@@ -50,15 +50,20 @@
               <input id="license-display-name" class="field-input" required placeholder="Назва ліцензії" />
             </label>
             <label class="form-field">
-              <span class="field-label">App + Version</span>
+              <span class="field-label">App + Channel</span>
               <div class="dropdown" id="app-version-dropdown">
                 <button type="button" class="dropdown-trigger" id="app-version-trigger" aria-haspopup="listbox">
-                  <span class="dropdown-value" id="app-version-value">Обрати програму та версію</span>
+                  <span class="dropdown-value" id="app-version-value">Обрати програму та канал</span>
                   <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
                 </button>
                 <div class="dropdown-panel" id="app-version-panel" role="listbox"></div>
               </div>
             </label>
+            <div class="form-row" id="license-version-pins-row" style="display: none;">
+              <span class="field-label">Версія (опційно)</span>
+              <div id="license-version-pins" class="version-pins-fields"></div>
+              <p class="muted" style="margin-top: 0.25rem;">Якщо не обрано — ліцензія завжди грузить найновішу версію програми.</p>
+            </div>
           </div>
           <div class="form-row">
             <label class="form-field">
@@ -82,6 +87,7 @@
             </label>
           </div>
           <button type="submit" class="btn-primary">Generate License</button>
+          <div id="license-form-error" class="error" style="display: none; margin-top: 0.5rem;"></div>
         </form>
       </section>
 
@@ -108,6 +114,7 @@
               <th>Name</th>
               <th>Status</th>
               <th>App / Channels</th>
+              <th>Версія</th>
               <th>Bound HWID</th>
               <th>Actions</th>
             </tr>

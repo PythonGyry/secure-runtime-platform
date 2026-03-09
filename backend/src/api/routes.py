@@ -47,14 +47,16 @@ class AdminLoginBody(BaseModel):
 
 class AdminLicenseCreateBody(BaseModel):
     display_name: str
-    channel_access: list[str] | dict[str, list[str]] | None = None  # legacy: ["stable"], new: {"wishlist": ["stable", "1.0.7"]}
+    channel_access: list[str] | dict[str, list[str]] | None = None  # {"wishlist": ["stable"], ...}
+    version_pins: dict[str, str] | None = None  # {"wishlist": "1.0.5"} — яку версію грузити; якщо нема — найновіша
     expires_at: str | None = None
     notes: str = ""
 
 
 class AdminLicenseUpdateBody(BaseModel):
     display_name: Optional[str] = None
-    channel_access: Optional[list[str]] = None
+    channel_access: Optional[dict[str, list[str]]] = None
+    version_pins: Optional[dict[str, str]] = None
     expires_at: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
@@ -127,7 +129,18 @@ def build_router(container) -> APIRouter:
             await asyncio.sleep(LICENSE_CHECK_FAIL_DELAY)
             return {"valid": False, "message": message}
 
-        package_record = container.package_repository.get_latest_release(requested_app, requested_channel)
+        version_pins = (license_record or {}).get("version_pins") or {}
+        if not isinstance(version_pins, dict):
+            version_pins = {}
+        pinned_version = version_pins.get(requested_app)
+        if pinned_version:
+            package_record = container.package_repository.get_release(
+                requested_app, requested_channel, pinned_version
+            )
+        else:
+            package_record = None
+        if not package_record:
+            package_record = container.package_repository.get_latest_release(requested_app, requested_channel)
         if not package_record:
             raise HTTPException(status_code=404, detail="No runtime package available")
 
@@ -250,13 +263,19 @@ def build_router(container) -> APIRouter:
         session = _require_admin(container, authorization)
         channel_access = body.channel_access
         if channel_access is None:
-            channel_access = {"wishlist": ["stable"]}
+            channel_access = {}
         elif isinstance(channel_access, list):
-            channel_access = {"wishlist": channel_access} if channel_access else {"wishlist": ["stable"]}
+            channel_access = {"wishlist": channel_access} if channel_access else {}
+        if isinstance(channel_access, dict) and not channel_access:
+            raise HTTPException(
+                status_code=400,
+                detail="Оберіть хоча б одну програму та канал (channel_access не може бути порожнім).",
+            )
         record = container.license_service.create(
             display_name=body.display_name,
             created_by=session["username"],
             channel_access=channel_access,
+            version_pins=body.version_pins or {},
             expires_at=body.expires_at,
             notes=body.notes,
         )
