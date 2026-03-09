@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Virtual env
+backend/venv/
+venv/
+
+# Build
+build/
+client/build_config.py
+client/build_icon.txt
+dist/
+*.egg-info/
+*.egg
+
+# Cython
+*.c
+
+# Runtime / packages
+.runtime_data/
+client/cache/
+runtime_logic/dist/
+backend/packages/
+
+# Sensitive (never commit)
+backend/data/admin_bootstrap.json
+backend/data/signing_keypair.json
+backend/data/db/
+backend/data/backups/
+runtime_logic/apps/*/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

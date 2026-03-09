@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Wishlist Admin</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app">
+    <section id="login-view" class="panel">
+      <h1>Wishlist Admin</h1>
+      <p class="muted">Log in with the bootstrap admin credentials from <code>backend/data/admin_bootstrap.json</code> (username and password).</p>
+      <form id="login-form" class="form-grid">
+        <label>
+          <span>Username</span>
+          <input id="username" value="admin" autocomplete="username" />
+        </label>
+        <label>
+          <span>Password</span>
+          <input id="password" type="password" autocomplete="current-password" />
+        </label>
+        <button type="submit">Log In</button>
+      </form>
+      <div id="login-error" class="error"></div>
+    </section>
+
+    <section id="dashboard-view" class="hidden">
+      <header class="toolbar">
+        <div>
+          <h1>Wishlist Admin</h1>
+          <p id="server-summary" class="muted"></p>
+        </div>
+        <button id="logout-button">Log Out</button>
+      </header>
+
+      <nav class="mobile-nav" id="mobile-nav" aria-label="Sections">
+        <button type="button" class="mobile-nav-tab active" data-panel="licenses">Licenses</button>
+        <button type="button" class="mobile-nav-tab" data-panel="keys">Keys</button>
+        <button type="button" class="mobile-nav-tab" data-panel="releases">Releases</button>
+        <button type="button" class="mobile-nav-tab" data-panel="audit">Audit</button>
+      </nav>
+
+      <section class="panel mobile-panel" id="panel-create-license" data-mobile-panel="licenses">
+        <h2>Create License</h2>
+        <form id="license-form" class="license-form">
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Display Name</span>
+              <input id="license-display-name" class="field-input" required placeholder="Назва ліцензії" />
+            </label>
+            <label class="form-field">
+              <span class="field-label">App + Version</span>
+              <div class="dropdown" id="app-version-dropdown">
+                <button type="button" class="dropdown-trigger" id="app-version-trigger" aria-haspopup="listbox">
+                  <span class="dropdown-value" id="app-version-value">Обрати програму та версію</span>
+                  <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+                </button>
+                <div class="dropdown-panel" id="app-version-panel" role="listbox"></div>
+              </div>
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="form-field">
+              <span class="field-label">Expires At</span>
+              <div class="expiry-field">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="license-no-expiry" checked />
+                  <span class="toggle-slider"></span>
+                  <span class="toggle-label">Безстрокова</span>
+                </label>
+                <div class="date-input-wrapper disabled" id="license-expires-wrapper">
+                  <input type="datetime-local" id="license-expires-at" class="field-input date-input" disabled />
+                </div>
+              </div>
+            </label>
+          </div>
+          <div class="form-row">
+            <label class="form-field full-width">
+              <span class="field-label">Notes</span>
+              <textarea id="license-notes" class="field-input" rows="3" placeholder="Додаткові примітки"></textarea>
+            </label>
+          </div>
+          <button type="submit" class="btn-primary">Generate License</button>
+        </form>
+      </section>
+
+      <section class="panel mobile-panel" id="panel-licenses" data-mobile-panel="licenses">
+        <div class="section-header">
+          <h2>Licenses</h2>
+          <div class="section-controls">
+            <div class="dropdown" id="licenses-app-dropdown">
+              <button type="button" class="dropdown-trigger" id="licenses-app-trigger" aria-haspopup="listbox">
+                <span class="dropdown-value" id="licenses-app-value">All apps</span>
+                <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+              </button>
+              <div class="dropdown-panel" id="licenses-app-panel" role="listbox"></div>
+            </div>
+            <button id="refresh-licenses">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Key</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>App / Channels</th>
+              <th>Bound HWID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="licenses-table"></tbody>
+        </table>
+        <div id="licenses-cards" class="cards-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel mobile-panel" id="panel-keys" data-mobile-panel="keys">
+        <div class="section-header">
+          <h2>Signing Keys</h2>
+          <div class="section-controls">
+            <div class="dropdown" id="keys-status-dropdown">
+              <button type="button" class="dropdown-trigger" id="keys-status-trigger" aria-haspopup="listbox">
+                <span class="dropdown-value" id="keys-status-value">All statuses</span>
+                <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+              </button>
+              <div class="dropdown-panel" id="keys-status-panel" role="listbox"></div>
+            </div>
+            <button id="generate-key">Generate Key</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Key ID</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="keys-table"></tbody>
+        </table>
+        <div id="keys-cards" class="cards-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel mobile-panel" id="panel-releases" data-mobile-panel="releases">
+        <div class="section-header">
+          <h2>Releases</h2>
+          <div class="section-controls">
+            <div class="dropdown dropdown-mobile-only" id="releases-filter-dropdown">
+              <button type="button" class="dropdown-trigger" id="releases-filter-trigger" aria-haspopup="listbox">
+                <span class="dropdown-value" id="releases-filter-value">All</span>
+                <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>
+              </button>
+              <div class="dropdown-panel" id="releases-filter-panel" role="listbox"></div>
+            </div>
+            <button id="sync-releases">Sync Packages</button>
+          </div>
+        </div>
+        <div class="tabs-bar tabs-desktop-only" id="releases-tabs">
+          <button type="button" class="tab active" data-app="" data-channel="">All</button>
+        </div>
+        <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>App</th>
+              <th>Channel</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Package</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="releases-table"></tbody>
+        </table>
+        <div id="releases-cards" class="cards-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel mobile-panel" id="panel-audit" data-mobile-panel="audit">
+        <h2>Audit Log</h2>
+        <div id="audit-log" class="audit-log"></div>
+      </section>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
