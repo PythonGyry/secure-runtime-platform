@@ -36,6 +36,13 @@ def main() -> int:
     elif bundle_url_file.exists():
         bundle_url_file.unlink()
 
+    # Фіксована апка для exe: при -a <app> клієнт завантажує тільки цю апку (без меню вибору)
+    bundle_app_file = project_root / "client" / "bundle_app.txt"
+    if app and app.strip():
+        bundle_app_file.write_text(app.strip(), encoding="utf-8")
+    elif bundle_app_file.exists():
+        bundle_app_file.unlink()
+
     # Видалення старих Cython-розширень (.pyd / .so) перед збіркою
     r_clean = subprocess.run(
         [sys.executable, str(project_root / "client" / "cython_prebuild_cleanup.py")],

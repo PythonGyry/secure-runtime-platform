@@ -209,3 +209,89 @@ def ask_license_key(
 
     root.mainloop()
     return result
+
+
+def ask_app_choice(apps: list[str]) -> str | None:
+    """Показати меню вибору апки кнопками. Повертає обрану апку або None при скасуванні."""
+    if not apps:
+        return None
+    if len(apps) == 1:
+        return apps[0]
+
+    root = tk.Tk()
+    result: str | None = None
+    bg_color = "#f5f5f5"
+    text_color = "#374151"
+    muted_color = "#6b7280"
+    border_color = "#d1d5db"
+    accent = "#0d9488"
+
+    root.title("Оберіть програму")
+    root.geometry("360x120+150+150")
+    root.resizable(False, False)
+    root.configure(bg=bg_color)
+    icon_path = get_verified_icon_path()
+    if icon_path:
+        try:
+            root.iconbitmap(str(icon_path))
+        except Exception:
+            pass
+
+    container = tk.Frame(root, bg=bg_color)
+    container.pack(fill="both", expand=True, padx=16, pady=12)
+
+    tk.Label(
+        container,
+        text="Ліцензія дає доступ до кількох програм. Оберіть, яку запустити:",
+        bg=bg_color,
+        fg=text_color,
+        font=("Segoe UI", 9),
+    ).pack(anchor="w", pady=(0, 10))
+
+    buttons_frame = tk.Frame(container, bg=bg_color)
+    buttons_frame.pack(fill="x")
+
+    def make_choice(app_id: str) -> None:
+        nonlocal result
+        result = app_id
+        root.destroy()
+
+    for i, app_id in enumerate(apps):
+        label = app_id.capitalize()
+        btn = tk.Button(
+            buttons_frame,
+            text=label,
+            command=lambda a=app_id: make_choice(a),
+            bg="white",
+            fg=text_color,
+            activebackground=border_color,
+            activeforeground=text_color,
+            font=("Segoe UI", 10),
+            relief="solid",
+            borderwidth=1,
+            highlightthickness=1,
+            highlightcolor=accent,
+            highlightbackground=border_color,
+            cursor="hand2",
+            width=14,
+        )
+        btn.grid(row=0, column=i, padx=6, pady=0)
+
+    tk.Button(
+        buttons_frame,
+        text="Скасувати",
+        command=lambda: make_choice("__cancel__"),
+        bg=bg_color,
+        fg=muted_color,
+        font=("Segoe UI", 9),
+        relief="flat",
+        cursor="hand2",
+    ).grid(row=1, column=0, columnspan=len(apps), pady=(12, 0))
+
+    shortcuts = StandardTextShortcuts(root)
+    shortcuts.install()
+    root.protocol("WM_DELETE_WINDOW", lambda: make_choice("__cancel__"))
+    root.lift()
+    root.focus_force()
+    root.mainloop()
+    return None if result == "__cancel__" else result

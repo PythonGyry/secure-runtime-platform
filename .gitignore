@@ -34,6 +34,7 @@ backend/data/backups/
 runtime_logic/apps/*/
 deploy_config.json
 client/bundle_server_url.txt
+client/bundle_app.txt
 .env
 .env.*
 !.env.example

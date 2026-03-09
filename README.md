@@ -17,6 +17,7 @@
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — структура проекту, платформа та застосунки
 - [ADDING_APPS.md](ADDING_APPS.md) — як додавати апки, підключати ключі, що імпортувати
+- [DEPLOY.md](DEPLOY.md) — деплой на Linux: доступ на сервер, nginx, HTTPS, вигрузка збірки з Windows
 - [SECURITY.md](SECURITY.md) — модель безпеки, шифрування, захист даних
 
 ## Швидкий старт

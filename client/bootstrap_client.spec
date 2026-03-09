@@ -29,6 +29,9 @@ _extra_datas = [(str(verified_ico), "icons")] if verified_ico.exists() else []
 _bundle_url = project_root / "client" / "bundle_server_url.txt"
 if _bundle_url.exists():
     _extra_datas.append((str(_bundle_url), "."))
+_bundle_app = project_root / "client" / "bundle_app.txt"
+if _bundle_app.exists():
+    _extra_datas.append((str(_bundle_app), "."))
 
 a = Analysis(
     [str(client_entry)],

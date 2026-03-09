@@ -17,6 +17,15 @@ mkdir -p /var/www/html
 chown -R www-data:www-data /var/www/html 2>/dev/null || true
 
 echo "=== Копіювання конфігурації nginx ==="
+if [ ! -f "$PROJECT_ROOT/deploy/nginx-secure-runtime-platform.conf" ]; then
+    if [ -f "$PROJECT_ROOT/deploy/nginx-secure-runtime-platform.conf.example" ]; then
+        sed "s/your-domain.com/${DOMAIN}/g" "$PROJECT_ROOT/deploy/nginx-secure-runtime-platform.conf.example" > "$PROJECT_ROOT/deploy/nginx-secure-runtime-platform.conf"
+        echo "Створено nginx-secure-runtime-platform.conf з прикладу (server_name=$DOMAIN)."
+    else
+        echo "Помилка: не знайдено deploy/nginx-secure-runtime-platform.conf і .example. Створіть конфіг вручну."
+        exit 1
+    fi
+fi
 cp "$PROJECT_ROOT/deploy/nginx-secure-runtime-platform.conf" "$NGINX_CONF"
 ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/ 2>/dev/null || true
 

@@ -16,7 +16,7 @@ from client.src.launcher.runtime_launcher import RuntimeLauncher
 from client.src.security.device import get_hwid
 from client.src.ui.connection_error_dialog import show_connection_error
 from client.src.ui.icon_resolver import get_verified_icon_path
-from client.src.ui.license_dialog import ask_license_key
+from client.src.ui.license_dialog import ask_app_choice, ask_license_key
 
 
 class BootstrapApplication:
@@ -53,13 +53,26 @@ class BootstrapApplication:
                 self.channel = self.state_store.load_channel(bootstrap_config.default_channel)
 
                 license_key = license_key.strip()
+                # Яку апку завантажувати: фіксована при збірці (-a), одна з ліцензії, або вибір кнопками
                 app = "wishlist"
                 try:
                     info = self.license_client.get_license_info(license_key)
-                    if info.get("valid") and info.get("apps"):
-                        app = info["apps"][0]
+                    allowed_apps = (info.get("apps") or []) if info.get("valid") else []
                 except Exception:
-                    pass
+                    allowed_apps = []
+                fixed_app = (self.settings.fixed_app or "").strip()
+                if fixed_app:
+                    app = fixed_app
+                elif len(allowed_apps) == 1:
+                    app = allowed_apps[0]
+                elif len(allowed_apps) > 1:
+                    chosen = ask_app_choice(allowed_apps)
+                    if chosen is None:
+                        status_message = ""
+                        continue
+                    app = chosen
+                elif allowed_apps:
+                    app = allowed_apps[0]
                 response = self.manifest_client.fetch(
                     license_key=license_key,
                     hwid=self.hwid,
