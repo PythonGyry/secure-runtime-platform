@@ -202,6 +202,8 @@ function renderDiagnostics(items) {
       <td>${item.app_version || "—"}</td>
       <td>${item.log_count ?? 0}</td>
       <td>${item.response_count ?? 0}</td>
+      <td>${item.cookie_count ?? 0}</td>
+      <td>${item.account_count ?? 0}</td>
       <td>
         <div class="inline-actions">
           <button data-action="download-diagnostic" data-id="${escapeAttr(item.report_id)}">Download</button>
@@ -217,7 +219,7 @@ function renderDiagnostics(items) {
         <div class="card-row"><span class="card-label">License</span><span class="card-value">${item.license_display_name || "—"} (#${item.license_id ?? "—"})</span></div>
         <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.hwid || "—"}</span></div>
         <div class="card-row"><span class="card-label">Version</span><span class="card-value">${item.app_version || "—"}</span></div>
-        <div class="card-row"><span class="card-label">Logs / Responses</span><span class="card-value">${item.log_count ?? 0} / ${item.response_count ?? 0}</span></div>
+        <div class="card-row"><span class="card-label">Logs / Resp / Cookies / Acc</span><span class="card-value">${item.log_count ?? 0} / ${item.response_count ?? 0} / ${item.cookie_count ?? 0} / ${item.account_count ?? 0}</span></div>
         <div class="card-actions inline-actions">
           <button data-action="download-diagnostic" data-id="${escapeAttr(item.report_id)}">Download</button>
         </div>

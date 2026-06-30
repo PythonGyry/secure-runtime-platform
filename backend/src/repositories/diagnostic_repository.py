@@ -59,6 +59,8 @@ class DiagnosticRepository:
                     "app_version": payload.get("app_version"),
                     "log_count": len(payload.get("logs") or []),
                     "response_count": len(payload.get("server_responses") or []),
+                    "cookie_count": len(payload.get("cookies") or []),
+                    "account_count": payload.get("account_count") or len(payload.get("accounts") or []),
                 }
             )
         return items
