@@ -38,6 +38,7 @@
         <button type="button" class="mobile-nav-tab active" data-panel="licenses">Licenses</button>
         <button type="button" class="mobile-nav-tab" data-panel="keys">Keys</button>
         <button type="button" class="mobile-nav-tab" data-panel="releases">Releases</button>
+        <button type="button" class="mobile-nav-tab" data-panel="diagnostics">Diagnostics</button>
         <button type="button" class="mobile-nav-tab" data-panel="audit">Audit</button>
       </nav>
 
@@ -187,6 +188,46 @@
           <tbody id="releases-table"></tbody>
         </table>
         <div id="releases-cards" class="cards-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel mobile-panel" id="panel-diagnostics" data-mobile-panel="diagnostics">
+        <div class="section-header">
+          <h2>User Diagnostics</h2>
+          <div class="section-controls">
+            <button id="refresh-diagnostics">Refresh</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom: 1rem;">
+          <label class="form-field">
+            <span class="field-label">HWID</span>
+            <input id="diagnostics-hwid-filter" class="field-input" placeholder="Фільтр за HWID" />
+          </label>
+          <label class="form-field">
+            <span class="field-label">License ID</span>
+            <input id="diagnostics-license-filter" class="field-input" placeholder="ID ліцензії" />
+          </label>
+          <button id="apply-diagnostics-filter">Filter</button>
+          <button class="secondary" id="clear-diagnostics-filter">Clear</button>
+        </div>
+        <p class="muted">Логи та HTTP-відповіді, які користувачі надіслали через кнопку [SEND LOGS] у клієнті.</p>
+        <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Uploaded</th>
+              <th>License</th>
+              <th>ID</th>
+              <th>HWID</th>
+              <th>Version</th>
+              <th>Logs</th>
+              <th>Responses</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="diagnostics-table"></tbody>
+        </table>
+        <div id="diagnostics-cards" class="cards-grid"></div>
         </div>
       </section>
 

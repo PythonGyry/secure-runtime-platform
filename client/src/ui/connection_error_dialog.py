@@ -37,7 +37,7 @@ def show_connection_error(server_url: str) -> None:
 
     tk.Label(
         main,
-        text="Не вдалося підключитися до сервера",
+        text="Не вдалося підключитися до сервера додатку (ліцензій)",
         bg=bg,
         fg=error_color,
         font=("Segoe UI", 11, "bold"),
@@ -49,7 +49,17 @@ def show_connection_error(server_url: str) -> None:
         bg=bg,
         fg=text_color,
         font=("Segoe UI", 9),
-    ).pack(anchor="w", pady=(0, 16))
+    ).pack(anchor="w", pady=(0, 8))
+
+    tk.Label(
+        main,
+        text="Це не сайт моніторингу — перевірте інтернет, VPN, фаєрвол. Якщо сервер доступний в браузері — спробуйте ще раз.",
+        bg=bg,
+        fg=text_color,
+        font=("Segoe UI", 9),
+        wraplength=360,
+        justify="left",
+    ).pack(anchor="w", pady=(0, 8))
 
     tk.Label(
         main,

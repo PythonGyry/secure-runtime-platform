@@ -9,6 +9,8 @@
   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, DEPLOY_KEY, DEPLOY_PASSWORD, DEPLOY_SERVER_URL
 
 Потрібно: pip install paramiko
+
+Версія скрипта: див. DEPLOY_SCRIPT_VERSION (для обліку змін при деплої).
 """
 from __future__ import annotations
 
@@ -20,6 +22,9 @@ import sys
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[1]
+
+# Версія цього скрипта (не плутати з -v / build package version).
+DEPLOY_SCRIPT_VERSION = "1.2.1"
 
 
 def load_config() -> dict:
@@ -50,6 +55,14 @@ def load_config() -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Зібрати (опціонально) та вигрузити backend/packages на Linux-сервер через SFTP",
+        epilog=(
+            "Важливо:\n"
+            "  • -h / --help тільки показує цю довідку (SFTP не виконується).\n"
+            "  • Без --build скрипт лише копіює вже наявні файли з backend/packages/.\n"
+            "  • Нова збірка з явною версією:  python scripts/deploy_to_server.py --build -a wishlist -v 1.2.1\n"
+            "     (-v завжди має пріоритет над полем version у deploy_config.json).\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--host", "-H", help="Хост сервера (напр. my.server.com або IP)")
     parser.add_argument("--user", "-u", help="SSH користувач")
@@ -60,11 +73,17 @@ def main() -> int:
     parser.add_argument("--build-client", action="store_true", help="Зібрати .exe клієнт з --server-url")
     parser.add_argument("--server-url", "-s", help="URL сервера для клієнта (напр. https://your-server.com)")
     parser.add_argument("--app", "-a", default="wishlist", help="App для build/build-client (default: wishlist)")
-    parser.add_argument("--version", "-v", default="1.0.0", help="Версія для build (default: 1.0.0)")
+    parser.add_argument(
+        "--version",
+        "-v",
+        default=None,
+        metavar="VER",
+        help=f"Версія для build пакетів (якщо не вказано — з deploy_config.json або {DEPLOY_SCRIPT_VERSION})",
+    )
     parser.add_argument("--client-name", "-n", help="Ім'я exe клієнта (default: <app>_bootstrap)")
     parser.add_argument("--dry-run", action="store_true", help="Тільки показати, що буде зроблено")
     args = parser.parse_args()
-
+    print(f"deploy_to_server.py — версія скрипта {DEPLOY_SCRIPT_VERSION}", flush=True)
     cfg = load_config()
     host = args.host or cfg.get("host")
     user = args.user or cfg.get("user")
@@ -72,6 +91,15 @@ def main() -> int:
     key_path = args.key or cfg.get("key_path")
     password = args.password or cfg.get("password")
     server_url = args.server_url or cfg.get("server_url")
+    # Версія пакета: явний -v у командному рядку має пріоритет над deploy_config.json.
+    if args.version is None:
+        args.version = str(cfg.get("version") or DEPLOY_SCRIPT_VERSION).strip() or DEPLOY_SCRIPT_VERSION
+        print(f"Версія build (з конфігу або default): {args.version}", flush=True)
+    else:
+        args.version = str(args.version).strip() or DEPLOY_SCRIPT_VERSION
+        print(f"Версія build (з аргументу -v): {args.version}", flush=True)
+    if not getattr(args, "client_name", None) and cfg.get("client_name"):
+        args.client_name = cfg.get("client_name")
 
     if not host or not user or not path:
         print("Потрібні --host, --user, --path (або deploy_config.json / змінні DEPLOY_*)", file=sys.stderr)
@@ -87,6 +115,14 @@ def main() -> int:
             print(f"  - manager.py client -a {args.app} -n {args.client_name or args.app + '_bootstrap'} --server-url {server_url or '(not set)'}")
         print(f"  - SFTP upload backend/packages/ -> {user}@{host}:{path}/backend/packages/")
         return 0
+
+    if not args.build:
+        print(
+            "Підказка: без --build нова збірка НЕ робиться — на сервер копіюються лише вже наявні "
+            f"файли в {PROJECT / 'backend' / 'packages'}. "
+            "Щоб зібрати пакет і вигрузити: додайте --build (і за потреби -v, -a).",
+            flush=True,
+        )
 
     # 1) Збірка пакетів
     if args.build:
@@ -118,10 +154,12 @@ def main() -> int:
         print("Папка backend/packages/ не знайдена. Запустіть спочатку: python manager.py build -a <app> -v <ver>", file=sys.stderr)
         return 1
 
-    files = list(packages_dir.iterdir())
+    files = [f for f in packages_dir.iterdir() if f.is_file()]
     if not files:
         print("backend/packages/ порожня. Нічого вигружати.", file=sys.stderr)
         return 1
+
+    print(f"Вигрузка {len(files)} файл(ів) з backend/packages/ (усі .zip/.json з цієї папки).", flush=True)
 
     try:
         import paramiko
@@ -154,10 +192,9 @@ def main() -> int:
                     sftp.mkdir(sub)
 
         for f in files:
-            if f.is_file():
-                remote_path = f"{remote_packages}/{f.name}"
-                sftp.put(str(f), remote_path)
-                print(f"  uploaded {f.name}")
+            remote_path = f"{remote_packages}/{f.name}"
+            sftp.put(str(f), remote_path)
+            print(f"  uploaded {f.name}")
 
         sftp.close()
         client.close()

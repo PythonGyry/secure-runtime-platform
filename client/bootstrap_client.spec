@@ -4,6 +4,8 @@
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_all
+
 project_root = Path.cwd().resolve()
 sys.path.insert(0, str(project_root))
 try:
@@ -33,11 +35,13 @@ _bundle_app = project_root / "client" / "bundle_app.txt"
 if _bundle_app.exists():
     _extra_datas.append((str(_bundle_app), "."))
 
+_curl_datas, _curl_binaries, _curl_hiddenimports = collect_all("curl_cffi")
+
 a = Analysis(
     [str(client_entry)],
     pathex=[str(project_root)],
-    binaries=[],
-    datas=_extra_datas,
+    binaries=_curl_binaries,
+    datas=_extra_datas + _curl_datas,
     hiddenimports=[
         "requests",
         "urllib3",
@@ -60,6 +64,11 @@ a = Analysis(
         "client.src.ui.license_dialog",
         "shared.contracts.runtime_manifest",
         "shared.crypto.runtime_crypto",
+        "curl_cffi",
+        "curl_cffi.requests",
+        "bs4",
+        "soupsieve",
+        *_curl_hiddenimports,
         "socks",
         "tkinter.filedialog",
         "tkinter.messagebox",
@@ -69,7 +78,21 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "PyQt5",
+        "PyQt6",
+        "matplotlib",
+        "IPython",
+        "gevent",
+        "pytest",
+        "numpy",
+        "pandas",
+        "scipy",
+        "PIL",
+        "cv2",
+        "torch",
+        "tensorflow",
+    ],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

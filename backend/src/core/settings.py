@@ -12,6 +12,7 @@ class BackendSettings:
     db_path: Path
     packages_dir: Path
     backups_dir: Path
+    diagnostics_dir: Path
     keypair_file: Path
     admin_bootstrap_file: Path
 
@@ -21,6 +22,7 @@ class BackendSettings:
         data_dir = root_dir / "data"
         packages_dir = root_dir / "packages"
         backups_dir = data_dir / "backups"
+        diagnostics_dir = data_dir / "diagnostics"
         db_dir = data_dir / "db"
         keypair_file = data_dir / "signing_keypair.json"
         admin_bootstrap_file = data_dir / "admin_bootstrap.json"
@@ -28,6 +30,7 @@ class BackendSettings:
         data_dir.mkdir(parents=True, exist_ok=True)
         packages_dir.mkdir(parents=True, exist_ok=True)
         backups_dir.mkdir(parents=True, exist_ok=True)
+        diagnostics_dir.mkdir(parents=True, exist_ok=True)
         db_dir.mkdir(parents=True, exist_ok=True)
 
         return cls(
@@ -37,6 +40,7 @@ class BackendSettings:
             db_path=db_dir / "licenses.db",
             packages_dir=packages_dir,
             backups_dir=backups_dir,
+            diagnostics_dir=diagnostics_dir,
             keypair_file=keypair_file,
             admin_bootstrap_file=admin_bootstrap_file,
         )

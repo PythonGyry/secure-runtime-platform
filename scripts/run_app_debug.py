@@ -5,7 +5,14 @@
 Використання (з кореня проєкту):
   python scripts/run_app_debug.py wishlist
   python scripts/run_app_debug.py -a wishlist
-  python scripts/run_app_debug.py --app my_tool
+  python scripts/run_app_debug.py wishlist --data-dir .dev_data_b
+
+Другий екземпляр з окремою БД (паралельно в іншому терміналі):
+  python scripts/run_app_debug.py wishlist --data-dir .dev_data_b
+
+Або через змінну середовища:
+  set WISHLIST_DATA_DIR=C:/path/to/my_data
+  python scripts/run_app_debug.py wishlist
 
 Список доступних апок:
   python scripts/run_app_debug.py --list
@@ -38,9 +45,25 @@ def list_app_ids() -> list[str]:
     )
 
 
-def build_debug_context(app_id: str) -> dict:
+def resolve_data_dir(app_id: str, data_dir: str | Path | None) -> Path:
+    """Каталог даних: акаунти, wishlist_secure.db, legacy."""
+    if data_dir is None or (isinstance(data_dir, str) and not str(data_dir).strip()):
+        env = os.environ.get("WISHLIST_DATA_DIR", "").strip()
+        if env:
+            data_dir = env
+        else:
+            return (get_apps_dir() / app_id / ".dev_data").resolve()
+    path = Path(data_dir)
+    if not path.is_absolute():
+        path = (get_apps_dir() / app_id / path).resolve()
+    else:
+        path = path.resolve()
+    return path
+
+
+def build_debug_context(app_id: str, *, data_dir: str | Path | None = None) -> dict:
     """Мінімальний context_payload для запуску апки в debug."""
-    dev_data = get_apps_dir() / app_id / ".dev_data"
+    dev_data = resolve_data_dir(app_id, data_dir)
     dev_data.mkdir(parents=True, exist_ok=True)
     legacy_dir = dev_data / "legacy"
     legacy_dir.mkdir(parents=True, exist_ok=True)
@@ -59,7 +82,7 @@ def build_debug_context(app_id: str) -> dict:
     }
 
 
-def run_app_debug(app_id: str) -> int:
+def run_app_debug(app_id: str, *, data_dir: str | Path | None = None) -> int:
     apps_dir = get_apps_dir()
     app_dir = apps_dir / app_id
     if not app_dir.is_dir():
@@ -81,9 +104,14 @@ def run_app_debug(app_id: str) -> int:
         print(f"Помилка: у модулі {module_name} немає функції run_runtime", file=sys.stderr)
         return 1
 
-    context_payload = build_debug_context(app_id)
+    context_payload = build_debug_context(app_id, data_dir=data_dir)
     if os.environ.get("RUNTIME_DEBUG", "").strip().lower() in ("1", "true", "yes"):
         context_payload["debug"] = True
+
+    db_path = Path(context_payload["runtime_data_dir"]) / "wishlist_secure.db"
+    print(f"[debug] app={app_id}")
+    print(f"[debug] data_dir={context_payload['runtime_data_dir']}")
+    print(f"[debug] db={db_path}")
 
     run_runtime(context_payload)
     return 0
@@ -100,6 +128,12 @@ def main() -> int:
     )
     parser.add_argument("-a", "--app-id", dest="app_id", help="Те саме, що позиційний app")
     parser.add_argument("-l", "--list", action="store_true", help="Показати список доступних апок")
+    parser.add_argument(
+        "--data-dir",
+        dest="data_dir",
+        metavar="PATH",
+        help="Окремий каталог даних (БД wishlist_secure.db). Відносний шлях — від runtime_logic/apps/<app>/",
+    )
     args = parser.parse_args()
 
     if args.list:
@@ -115,7 +149,7 @@ def main() -> int:
     app_id = args.app_id or args.app
     if not app_id:
         parser.error("Вкажи ID апки (наприклад wishlist) або --list для списку")
-    return run_app_debug(app_id)
+    return run_app_debug(app_id, data_dir=args.data_dir)
 
 
 if __name__ == "__main__":

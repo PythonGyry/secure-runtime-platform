@@ -12,12 +12,14 @@ from backend.src.core.rate_limit import RateLimitExceeded, rate_limit_exceeded_h
 from backend.src.core.settings import BackendSettings
 from backend.src.repositories.admin_repository import AdminRepository
 from backend.src.repositories.backup_repository import BackupRepository
+from backend.src.repositories.diagnostic_repository import DiagnosticRepository
 from backend.src.repositories.download_token_repository import DownloadTokenRepository
 from backend.src.repositories.key_repository import KeyRepository
 from backend.src.repositories.license_repository import LicenseRepository
 from backend.src.repositories.package_repository import PackageRepository
 from backend.src.services.admin_auth_service import AdminAuthService
 from backend.src.services.backup_service import BackupService
+from backend.src.services.diagnostic_service import DiagnosticService
 from backend.src.services.license_service import LicenseService
 from backend.src.services.manifest_service import ManifestService
 from backend.src.services.runtime_package_service import RuntimePackageService
@@ -36,6 +38,7 @@ class Container:
         self.package_repository = PackageRepository(self.database, self.settings.packages_dir)
         self.download_token_repository = DownloadTokenRepository(self.database)
         self.backup_repository = BackupRepository(self.settings.backups_dir)
+        self.diagnostic_repository = DiagnosticRepository(self.settings.diagnostics_dir)
 
         self.key_repository.ensure_default_key(self.settings.keypair_file)
         self.admin_repository.ensure_bootstrap_admin(self.settings.admin_bootstrap_file)
@@ -46,6 +49,7 @@ class Container:
         self.manifest_service = ManifestService()
         self.runtime_package_service = RuntimePackageService()
         self.backup_service = BackupService(self.backup_repository)
+        self.diagnostic_service = DiagnosticService(self.diagnostic_repository)
 
     def get_server_salt(self) -> str:
         return self.admin_repository.get_config("server_salt", "wishlist-runtime-salt") or "wishlist-runtime-salt"

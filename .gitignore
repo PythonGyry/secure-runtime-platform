@@ -26,6 +26,23 @@ client/cache/
 runtime_logic/dist/
 backend/packages/
 **/.dev_data/
+backend/data/diagnostics/
+
+# Local exports, captures, portable bundles (never commit)
+export_*/
+export_today/
+get_page_*.json
+response_*.html
+bank
+test.txt
+/*.js
+wishlist_app/
+wishlist_app_*/
+wishlist_source_public/
+*.zip
+
+# Temp / one-off local scripts
+scripts/_tmp_*
 
 # Sensitive (never commit)
 backend/data/admin_bootstrap.json

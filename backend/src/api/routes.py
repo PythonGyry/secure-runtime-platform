@@ -214,6 +214,18 @@ def build_router(container) -> APIRouter:
         container.backup_service.save_backup(body.hwid, body.payload)
         return {"status": "saved"}
 
+    @public_router.post("/diagnostic/upload")
+    def diagnostic_upload(body: BackupBody) -> dict:
+        is_valid, message, license_record = container.license_service.verify(body.license_key, body.hwid)
+        if not is_valid:
+            raise HTTPException(status_code=403, detail=message)
+
+        return container.diagnostic_service.save_report(
+            body.hwid,
+            body.payload,
+            license_record=license_record,
+        )
+
     @public_router.post("/backup/download")
     def backup_download(body: BackupLoadBody) -> dict:
         is_valid, message, _license_record = container.license_service.verify(body.license_key, body.hwid)
@@ -401,6 +413,28 @@ def build_router(container) -> APIRouter:
     def admin_audit(authorization: str | None = Header(default=None)) -> dict:
         _require_admin(container, authorization)
         return {"items": container.admin_repository.list_audit_log()}
+
+    @admin_router.get("/diagnostics")
+    def admin_list_diagnostics(
+        hwid: str | None = None,
+        license_id: int | None = None,
+        authorization: str | None = Header(default=None),
+    ) -> dict:
+        _require_admin(container, authorization)
+        return {
+            "items": container.diagnostic_service.list_reports(
+                hwid=(hwid or "").strip() or None,
+                license_id=license_id,
+            )
+        }
+
+    @admin_router.get("/diagnostics/{report_id}")
+    def admin_get_diagnostic(report_id: str, authorization: str | None = Header(default=None)) -> dict:
+        _require_admin(container, authorization)
+        report = container.diagnostic_service.get_report(report_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Diagnostic report not found")
+        return report
 
     router.include_router(public_router)
     router.include_router(admin_router)

@@ -14,6 +14,8 @@ const state = {
   releases: [],
   licenses: [],
   keys: [],
+  diagnostics: [],
+  diagnosticsFilter: { hwid: "", licenseId: "" },
   licensesAppFilter: "",
   keysStatusFilter: "",
   releasesTab: { app: "", channel: "" },
@@ -28,6 +30,7 @@ const licensesTable = document.getElementById("licenses-table");
 const keysTable = document.getElementById("keys-table");
 const releasesTable = document.getElementById("releases-table");
 const auditLog = document.getElementById("audit-log");
+const diagnosticsTable = document.getElementById("diagnostics-table");
 
 async function api(path, options = {}) {
   const headers = {
@@ -157,6 +160,7 @@ function renderLicenses(items) {
           <button data-action="toggle-license" data-id="${item.license_id}" data-status="${item.status}">
             ${item.status === "active" ? "Disable" : "Enable"}
           </button>
+          <button class="secondary" data-action="view-diagnostics" data-id="${item.license_id}" data-hwid="${escapeAttr(item.bound_hwid || "")}">Logs</button>
           <button class="secondary" data-action="unbind-license" data-id="${item.license_id}">Unbind</button>
           <button class="secondary" data-action="regenerate-license" data-id="${item.license_id}">Regenerate</button>
           <button class="secondary" data-action="delete-license" data-id="${item.license_id}">Delete</button>
@@ -177,6 +181,7 @@ function renderLicenses(items) {
         <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.bound_hwid || "—"}</span></div>
         <div class="card-actions inline-actions">
           <button data-action="toggle-license" data-id="${item.license_id}" data-status="${item.status}">${item.status === "active" ? "Disable" : "Enable"}</button>
+          <button class="secondary" data-action="view-diagnostics" data-id="${item.license_id}" data-hwid="${escapeAttr(item.bound_hwid || "")}">Logs</button>
           <button class="secondary" data-action="unbind-license" data-id="${item.license_id}">Unbind</button>
           <button class="secondary" data-action="regenerate-license" data-id="${item.license_id}">Regenerate</button>
           <button class="secondary" data-action="delete-license" data-id="${item.license_id}">Delete</button>
@@ -184,6 +189,84 @@ function renderLicenses(items) {
       </div>
     `).join("");
   }
+}
+
+function renderDiagnostics(items) {
+  if (!diagnosticsTable) return;
+  diagnosticsTable.innerHTML = items.map((item) => `
+    <tr>
+      <td>${item.uploaded_at || "—"}</td>
+      <td>${item.license_display_name || "—"}</td>
+      <td>${item.license_id ?? "—"}</td>
+      <td title="${escapeAttr(item.hwid || "")}">${(item.hwid || "—").slice(0, 18)}${(item.hwid || "").length > 18 ? "…" : ""}</td>
+      <td>${item.app_version || "—"}</td>
+      <td>${item.log_count ?? 0}</td>
+      <td>${item.response_count ?? 0}</td>
+      <td>
+        <div class="inline-actions">
+          <button data-action="download-diagnostic" data-id="${escapeAttr(item.report_id)}">Download</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+  const cardsEl = document.getElementById("diagnostics-cards");
+  if (cardsEl) {
+    cardsEl.innerHTML = items.map((item) => `
+      <div class="card">
+        <div class="card-row"><span class="card-label">Uploaded</span><span class="card-value">${item.uploaded_at || "—"}</span></div>
+        <div class="card-row"><span class="card-label">License</span><span class="card-value">${item.license_display_name || "—"} (#${item.license_id ?? "—"})</span></div>
+        <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.hwid || "—"}</span></div>
+        <div class="card-row"><span class="card-label">Version</span><span class="card-value">${item.app_version || "—"}</span></div>
+        <div class="card-row"><span class="card-label">Logs / Responses</span><span class="card-value">${item.log_count ?? 0} / ${item.response_count ?? 0}</span></div>
+        <div class="card-actions inline-actions">
+          <button data-action="download-diagnostic" data-id="${escapeAttr(item.report_id)}">Download</button>
+        </div>
+      </div>
+    `).join("");
+  }
+}
+
+function buildDiagnosticsQuery() {
+  const params = new URLSearchParams();
+  const hwid = (state.diagnosticsFilter.hwid || "").trim();
+  const licenseId = (state.diagnosticsFilter.licenseId || "").trim();
+  if (hwid) params.set("hwid", hwid);
+  if (licenseId) params.set("license_id", licenseId);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+async function downloadDiagnosticReport(reportId) {
+  const report = await api(`/api/admin/diagnostics/${encodeURIComponent(reportId)}`);
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${reportId}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function showDiagnosticsPanel(filter = {}) {
+  state.diagnosticsFilter = {
+    hwid: filter.hwid || "",
+    licenseId: filter.licenseId ? String(filter.licenseId) : "",
+  };
+  const hwidInput = document.getElementById("diagnostics-hwid-filter");
+  const licenseInput = document.getElementById("diagnostics-license-filter");
+  if (hwidInput) hwidInput.value = state.diagnosticsFilter.hwid;
+  if (licenseInput) licenseInput.value = state.diagnosticsFilter.licenseId;
+  const tab = document.querySelector('.mobile-nav-tab[data-panel="diagnostics"]');
+  if (tab) tab.click();
+  refreshDiagnostics();
+}
+
+async function refreshDiagnostics() {
+  const payload = await api(`/api/admin/diagnostics${buildDiagnosticsQuery()}`);
+  state.diagnostics = payload.items || [];
+  renderDiagnostics(state.diagnostics);
 }
 
 function renderKeys(items) {
@@ -262,17 +345,19 @@ async function refreshAll() {
   state.bootstrap = await api("/api/admin/bootstrap");
   serverSummary.textContent = `Default channel: ${state.bootstrap.server.default_channel}. Trusted keys: ${Object.keys(state.bootstrap.server.trusted_public_keys).length}.`;
 
-  const [appsRes, licenses, keys, releases, audit] = await Promise.all([
+  const [appsRes, licenses, keys, releases, audit, diagnostics] = await Promise.all([
     api("/api/admin/apps"),
     api("/api/admin/licenses"),
     api("/api/admin/keys"),
     api("/api/admin/releases"),
     api("/api/admin/audit"),
+    api(`/api/admin/diagnostics${buildDiagnosticsQuery()}`),
   ]);
   state.apps = Array.isArray(appsRes?.items) ? appsRes.items : [];
   state.licenses = licenses.items;
   state.keys = keys.items;
   state.releases = releases.items;
+  state.diagnostics = diagnostics.items || [];
   const { app: tabApp, channel: tabChannel } = state.releasesTab;
   const filteredReleases = releases.items.filter((r) => {
     const app = r.app || "wishlist";
@@ -284,6 +369,7 @@ async function refreshAll() {
   renderKeys(keys.items);
   renderReleases(filteredReleases);
   renderAudit(audit.items);
+  renderDiagnostics(state.diagnostics);
   updateReleasesTabs();
   updateReleasesFilterDropdown();
   updateLicensesAppDropdown();
@@ -645,6 +731,22 @@ initKeysStatusDropdown();
 initReleasesFilterDropdown();
 
 document.getElementById("refresh-licenses").addEventListener("click", refreshAll);
+document.getElementById("refresh-diagnostics")?.addEventListener("click", refreshDiagnostics);
+document.getElementById("apply-diagnostics-filter")?.addEventListener("click", () => {
+  state.diagnosticsFilter = {
+    hwid: document.getElementById("diagnostics-hwid-filter")?.value.trim() || "",
+    licenseId: document.getElementById("diagnostics-license-filter")?.value.trim() || "",
+  };
+  refreshDiagnostics();
+});
+document.getElementById("clear-diagnostics-filter")?.addEventListener("click", () => {
+  state.diagnosticsFilter = { hwid: "", licenseId: "" };
+  const hwidInput = document.getElementById("diagnostics-hwid-filter");
+  const licenseInput = document.getElementById("diagnostics-license-filter");
+  if (hwidInput) hwidInput.value = "";
+  if (licenseInput) licenseInput.value = "";
+  refreshDiagnostics();
+});
 document.getElementById("generate-key").addEventListener("click", async () => {
   await api("/api/admin/keys", { method: "POST" });
   await refreshAll();
@@ -730,6 +832,15 @@ document.body.addEventListener("click", async (event) => {
       method: "PATCH",
       body: JSON.stringify({ status: "deprecated" }),
     });
+  } else if (action === "view-diagnostics") {
+    showDiagnosticsPanel({
+      licenseId: button.dataset.id,
+      hwid: button.dataset.hwid || "",
+    });
+    return;
+  } else if (action === "download-diagnostic") {
+    await downloadDiagnosticReport(button.dataset.id);
+    return;
   }
   await refreshAll();
 });
