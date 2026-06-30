@@ -34,6 +34,14 @@
         <button id="logout-button">Log Out</button>
       </header>
 
+      <nav class="main-nav" id="main-nav" aria-label="Sections">
+        <button type="button" class="main-nav-tab active" data-panel="licenses">Licenses</button>
+        <button type="button" class="main-nav-tab" data-panel="keys">Keys</button>
+        <button type="button" class="main-nav-tab" data-panel="releases">Releases</button>
+        <button type="button" class="main-nav-tab" data-panel="diagnostics">Diagnostics</button>
+        <button type="button" class="main-nav-tab" data-panel="audit">Audit</button>
+      </nav>
+
       <nav class="mobile-nav" id="mobile-nav" aria-label="Sections">
         <button type="button" class="mobile-nav-tab active" data-panel="licenses">Licenses</button>
         <button type="button" class="mobile-nav-tab" data-panel="keys">Keys</button>
@@ -196,8 +204,10 @@
           <h2>User Diagnostics</h2>
           <div class="section-controls">
             <button id="refresh-diagnostics">Refresh</button>
+            <button class="secondary" id="rebuild-diagnostics-index">Rebuild index</button>
           </div>
         </div>
+        <p id="diagnostics-status" class="muted diagnostics-status">Натисніть Refresh, щоб завантажити звіти.</p>
         <div class="form-row" style="margin-bottom: 1rem;">
           <label class="form-field">
             <span class="field-label">HWID</span>
@@ -220,6 +230,7 @@
               <th>ID</th>
               <th>HWID</th>
               <th>Version</th>
+              <th>Size</th>
               <th>Logs</th>
               <th>Resp</th>
               <th>Cookies</th>

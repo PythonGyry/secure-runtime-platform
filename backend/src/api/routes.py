@@ -436,6 +436,12 @@ def build_router(container) -> APIRouter:
             raise HTTPException(status_code=404, detail="Diagnostic report not found")
         return report
 
+    @admin_router.post("/diagnostics/rebuild-index")
+    def admin_rebuild_diagnostics_index(authorization: str | None = Header(default=None)) -> dict:
+        _require_admin(container, authorization)
+        count = container.diagnostic_service.rebuild_index()
+        return {"status": "ok", "count": count}
+
     router.include_router(public_router)
     router.include_router(admin_router)
     return router

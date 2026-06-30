@@ -62,19 +62,20 @@ function toggleView(isAuthenticated) {
 }
 
 function initMobileNav() {
-  const nav = document.getElementById("mobile-nav");
-  const tabs = nav?.querySelectorAll(".mobile-nav-tab");
   const panels = document.querySelectorAll(".mobile-panel");
-  if (!tabs?.length || !panels.length) return;
+  const tabs = document.querySelectorAll(".mobile-nav-tab, .main-nav-tab");
+  if (!tabs.length || !panels.length) return;
 
   function showPanel(panelId) {
-    panels.forEach((p) => {
-      const match = p.dataset.mobilePanel === panelId;
-      p.classList.toggle("mobile-panel-visible", match);
+    panels.forEach((panel) => {
+      panel.classList.toggle("mobile-panel-visible", panel.dataset.mobilePanel === panelId);
     });
-    tabs.forEach((t) => {
-      t.classList.toggle("active", t.dataset.panel === panelId);
+    tabs.forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.panel === panelId);
     });
+    if (panelId === "diagnostics") {
+      refreshDiagnostics().catch(() => {});
+    }
   }
 
   tabs.forEach((tab) => {
@@ -191,8 +192,30 @@ function renderLicenses(items) {
   }
 }
 
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function setDiagnosticsStatus(message, kind = "muted") {
+  const statusEl = document.getElementById("diagnostics-status");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.classList.remove("error", "success");
+  if (kind === "error") statusEl.classList.add("error");
+  if (kind === "success") statusEl.classList.add("success");
+}
+
 function renderDiagnostics(items) {
   if (!diagnosticsTable) return;
+  if (!items.length) {
+    diagnosticsTable.innerHTML = `<tr><td colspan="11" class="empty-state">Звітів немає. Перевірте фільтр або натисніть Rebuild index.</td></tr>`;
+    const cardsEl = document.getElementById("diagnostics-cards");
+    if (cardsEl) cardsEl.innerHTML = "";
+    return;
+  }
   diagnosticsTable.innerHTML = items.map((item) => `
     <tr>
       <td>${item.uploaded_at || "—"}</td>
@@ -200,6 +223,7 @@ function renderDiagnostics(items) {
       <td>${item.license_id ?? "—"}</td>
       <td title="${escapeAttr(item.hwid || "")}">${(item.hwid || "—").slice(0, 18)}${(item.hwid || "").length > 18 ? "…" : ""}</td>
       <td>${item.app_version || "—"}</td>
+      <td>${formatFileSize(item.file_size)}</td>
       <td>${item.log_count ?? 0}</td>
       <td>${item.response_count ?? 0}</td>
       <td>${item.cookie_count ?? 0}</td>
@@ -219,6 +243,7 @@ function renderDiagnostics(items) {
         <div class="card-row"><span class="card-label">License</span><span class="card-value">${item.license_display_name || "—"} (#${item.license_id ?? "—"})</span></div>
         <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.hwid || "—"}</span></div>
         <div class="card-row"><span class="card-label">Version</span><span class="card-value">${item.app_version || "—"}</span></div>
+        <div class="card-row"><span class="card-label">Size</span><span class="card-value">${formatFileSize(item.file_size)}</span></div>
         <div class="card-row"><span class="card-label">Logs / Resp / Cookies / Acc</span><span class="card-value">${item.log_count ?? 0} / ${item.response_count ?? 0} / ${item.cookie_count ?? 0} / ${item.account_count ?? 0}</span></div>
         <div class="card-actions inline-actions">
           <button data-action="download-diagnostic" data-id="${escapeAttr(item.report_id)}">Download</button>
@@ -260,15 +285,33 @@ function showDiagnosticsPanel(filter = {}) {
   const licenseInput = document.getElementById("diagnostics-license-filter");
   if (hwidInput) hwidInput.value = state.diagnosticsFilter.hwid;
   if (licenseInput) licenseInput.value = state.diagnosticsFilter.licenseId;
-  const tab = document.querySelector('.mobile-nav-tab[data-panel="diagnostics"]');
-  if (tab) tab.click();
-  refreshDiagnostics();
+  const mobileTab = document.querySelector('#mobile-nav .mobile-nav-tab[data-panel="diagnostics"]');
+  const mainTab = document.querySelector('#main-nav .main-nav-tab[data-panel="diagnostics"]');
+  (mobileTab || mainTab)?.click();
 }
 
 async function refreshDiagnostics() {
-  const payload = await api(`/api/admin/diagnostics${buildDiagnosticsQuery()}`);
-  state.diagnostics = payload.items || [];
-  renderDiagnostics(state.diagnostics);
+  const refreshBtn = document.getElementById("refresh-diagnostics");
+  try {
+    if (refreshBtn) refreshBtn.disabled = true;
+    setDiagnosticsStatus("Завантаження звітів…");
+    const payload = await api(`/api/admin/diagnostics${buildDiagnosticsQuery()}`);
+    state.diagnostics = payload.items || [];
+    renderDiagnostics(state.diagnostics);
+    if (state.diagnostics.length) {
+      setDiagnosticsStatus(`Знайдено звітів: ${state.diagnostics.length}`, "success");
+    } else if (state.diagnosticsFilter.hwid || state.diagnosticsFilter.licenseId) {
+      setDiagnosticsStatus("За цим фільтром звітів немає. Спробуйте Clear.", "error");
+    } else {
+      setDiagnosticsStatus("Звітів поки немає. Після [SEND LOGS] у клієнті натисніть Refresh.", "muted");
+    }
+  } catch (error) {
+    renderDiagnostics([]);
+    setDiagnosticsStatus(`Помилка завантаження: ${error.message}`, "error");
+    throw error;
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
 }
 
 function renderKeys(items) {
@@ -347,19 +390,22 @@ async function refreshAll() {
   state.bootstrap = await api("/api/admin/bootstrap");
   serverSummary.textContent = `Default channel: ${state.bootstrap.server.default_channel}. Trusted keys: ${Object.keys(state.bootstrap.server.trusted_public_keys).length}.`;
 
-  const [appsRes, licenses, keys, releases, audit, diagnostics] = await Promise.all([
+  const [appsRes, licenses, keys, releases, audit] = await Promise.all([
     api("/api/admin/apps"),
     api("/api/admin/licenses"),
     api("/api/admin/keys"),
     api("/api/admin/releases"),
     api("/api/admin/audit"),
-    api(`/api/admin/diagnostics${buildDiagnosticsQuery()}`),
   ]);
   state.apps = Array.isArray(appsRes?.items) ? appsRes.items : [];
   state.licenses = licenses.items;
   state.keys = keys.items;
   state.releases = releases.items;
-  state.diagnostics = diagnostics.items || [];
+  try {
+    await refreshDiagnostics();
+  } catch {
+    /* status already shown in diagnostics panel */
+  }
   const { app: tabApp, channel: tabChannel } = state.releasesTab;
   const filteredReleases = releases.items.filter((r) => {
     const app = r.app || "wishlist";
@@ -371,7 +417,6 @@ async function refreshAll() {
   renderKeys(keys.items);
   renderReleases(filteredReleases);
   renderAudit(audit.items);
-  renderDiagnostics(state.diagnostics);
   updateReleasesTabs();
   updateReleasesFilterDropdown();
   updateLicensesAppDropdown();
@@ -733,13 +778,29 @@ initKeysStatusDropdown();
 initReleasesFilterDropdown();
 
 document.getElementById("refresh-licenses").addEventListener("click", refreshAll);
-document.getElementById("refresh-diagnostics")?.addEventListener("click", refreshDiagnostics);
+document.getElementById("refresh-diagnostics")?.addEventListener("click", () => {
+  refreshDiagnostics().catch(() => {});
+});
+document.getElementById("rebuild-diagnostics-index")?.addEventListener("click", async () => {
+  const btn = document.getElementById("rebuild-diagnostics-index");
+  try {
+    if (btn) btn.disabled = true;
+    setDiagnosticsStatus("Перебудова індексу…");
+    const payload = await api("/api/admin/diagnostics/rebuild-index", { method: "POST" });
+    setDiagnosticsStatus(`Індекс оновлено: ${payload.count} звіт(ів)`, "success");
+    await refreshDiagnostics();
+  } catch (error) {
+    setDiagnosticsStatus(`Помилка індексу: ${error.message}`, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
 document.getElementById("apply-diagnostics-filter")?.addEventListener("click", () => {
   state.diagnosticsFilter = {
     hwid: document.getElementById("diagnostics-hwid-filter")?.value.trim() || "",
     licenseId: document.getElementById("diagnostics-license-filter")?.value.trim() || "",
   };
-  refreshDiagnostics();
+  refreshDiagnostics().catch(() => {});
 });
 document.getElementById("clear-diagnostics-filter")?.addEventListener("click", () => {
   state.diagnosticsFilter = { hwid: "", licenseId: "" };
@@ -747,7 +808,7 @@ document.getElementById("clear-diagnostics-filter")?.addEventListener("click", (
   const licenseInput = document.getElementById("diagnostics-license-filter");
   if (hwidInput) hwidInput.value = "";
   if (licenseInput) licenseInput.value = "";
-  refreshDiagnostics();
+  refreshDiagnostics().catch(() => {});
 });
 document.getElementById("generate-key").addEventListener("click", async () => {
   await api("/api/admin/keys", { method: "POST" });

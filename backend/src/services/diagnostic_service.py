@@ -17,6 +17,9 @@ class DiagnosticService:
             }
         return self.repository.save(hwid, payload, license_meta=license_meta)
 
+    def rebuild_index(self) -> int:
+        return self.repository.rebuild_index()
+
     def list_reports(self, *, hwid: str | None = None, license_id: int | None = None) -> list[dict]:
         return self.repository.list_reports(hwid=hwid, license_id=license_id)
 

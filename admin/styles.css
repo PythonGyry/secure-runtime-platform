@@ -138,9 +138,66 @@ body {
   .mobile-nav {
     display: none !important;
   }
-  .mobile-panel {
-    display: block !important;
+  .main-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
   }
+  .mobile-panel {
+    display: none;
+  }
+  .mobile-panel.mobile-panel-visible {
+    display: block;
+  }
+}
+
+.main-nav {
+  display: none;
+}
+
+.main-nav-tab {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #111827;
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.main-nav-tab:hover {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.main-nav-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.diagnostics-status {
+  min-height: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.diagnostics-status.error {
+  color: #f87171;
+}
+
+.diagnostics-status.success {
+  color: #4ade80;
+}
+
+.empty-state {
+  padding: 24px 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
 }
 
 /* Tabs - hidden on mobile when dropdown is used */
