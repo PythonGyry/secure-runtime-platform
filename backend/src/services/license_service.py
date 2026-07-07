@@ -102,6 +102,8 @@ class LicenseService:
         hwid: str,
         channel: str = "stable",
         app: str = "wishlist",
+        *,
+        legacy_hwid: str | None = None,
     ) -> tuple[bool, str, dict | None]:
         record = self.repository.get_managed_license(license_key)
         if not record:
@@ -123,9 +125,17 @@ class LicenseService:
             return False, f"App '{app}' / channel '{channel}' is not allowed for this license", None
 
         bound_hwid = record.get("bound_hwid")
+        legacy = (legacy_hwid or "").strip() or None
         if bound_hwid and bound_hwid != hwid:
-            return False, "License is already bound to another device", None
-        if not bound_hwid:
+            if legacy and bound_hwid == legacy:
+                record = self.repository.update_managed_license(
+                    record["license_id"],
+                    bound_hwid=hwid,
+                    last_used_at=datetime.utcnow().isoformat(),
+                )
+            else:
+                return False, "License is already bound to another device", None
+        elif not bound_hwid:
             record = self.repository.update_managed_license(
                 record["license_id"],
                 bound_hwid=hwid,

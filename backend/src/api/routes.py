@@ -19,6 +19,7 @@ class LicenseCheckBody(BaseModel):
     hwid: str
     app: str = "wishlist"
     channel: str = "stable"
+    legacy_hwid: str | None = None
 
 
 class LicenseInfoBody(BaseModel):
@@ -124,6 +125,7 @@ def build_router(container) -> APIRouter:
             (body.hwid or "").strip(),
             requested_channel,
             app=requested_app,
+            legacy_hwid=(body.legacy_hwid or "").strip() or None,
         )
         if not is_valid:
             await asyncio.sleep(LICENSE_CHECK_FAIL_DELAY)

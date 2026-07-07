@@ -48,13 +48,23 @@ class LicenseClient:
         response.raise_for_status()
         return response.json()
 
-    def check_license(self, license_key: str, hwid: str, channel: str = "stable", app: str = "wishlist") -> Dict[str, Any]:
+    def check_license(
+        self,
+        license_key: str,
+        hwid: str,
+        channel: str = "stable",
+        app: str = "wishlist",
+        *,
+        legacy_hwid: str | None = None,
+    ) -> Dict[str, Any]:
         payload = {
             "license_key": license_key,
             "hwid": hwid,
             "channel": channel,
             "app": app,
         }
+        if legacy_hwid:
+            payload["legacy_hwid"] = legacy_hwid
         response = _request_with_retry(
             "POST",
             f"{self.server_base_url}/api/v1/license/check",

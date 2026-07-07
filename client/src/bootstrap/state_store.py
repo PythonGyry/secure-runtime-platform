@@ -11,9 +11,15 @@ _DPAPI_PREFIX = "dpapi:"
 
 
 class BootstrapStateStore:
-    def __init__(self, path: Path, hwid: str) -> None:
+    def __init__(self, path: Path, hwid: str, *, legacy_hwid: str | None = None) -> None:
         self.path = path
         self.key = derive_fernet_key("bootstrap-state", hwid)
+        legacy = (legacy_hwid or "").strip()
+        self._legacy_key = (
+            derive_fernet_key("bootstrap-state", legacy)
+            if legacy and legacy != hwid
+            else None
+        )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
@@ -41,15 +47,19 @@ class BootstrapStateStore:
         if not row:
             return None
         raw = row[0]
-        try:
-            if raw.startswith(_DPAPI_PREFIX):
-                if not is_available():
-                    return None
-                blob = unprotect_b64(raw[len(_DPAPI_PREFIX) :])
-                return decrypt_bytes(blob, key=self.key).decode("utf-8")
-            return decrypt_bytes(raw.encode("utf-8"), key=self.key).decode("utf-8")
-        except Exception:
-            return None
+        for key in (self.key, self._legacy_key):
+            if key is None:
+                continue
+            try:
+                if raw.startswith(_DPAPI_PREFIX):
+                    if not is_available():
+                        continue
+                    blob = unprotect_b64(raw[len(_DPAPI_PREFIX) :])
+                    return decrypt_bytes(blob, key=key).decode("utf-8")
+                return decrypt_bytes(raw.encode("utf-8"), key=key).decode("utf-8")
+            except Exception:
+                continue
+        return None
 
     def _save(self, state_key: str, value: str) -> None:
         fernet_blob = encrypt_bytes(value.encode("utf-8"), key=self.key)

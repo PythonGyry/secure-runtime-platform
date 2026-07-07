@@ -13,7 +13,7 @@ from client.src.bootstrap.package_verifier import PackageVerifier
 from client.src.bootstrap.state_store import BootstrapStateStore
 from client.src.config.bootstrap_settings import BootstrapSettings
 from client.src.launcher.runtime_launcher import RuntimeLauncher
-from client.src.security.device import get_hwid
+from client.src.security.device import get_hwid, get_legacy_hwid
 from client.src.ui.connection_error_dialog import show_connection_error
 from client.src.ui.icon_resolver import get_verified_icon_path
 from client.src.ui.license_dialog import ask_app_choice, ask_license_key
@@ -23,7 +23,12 @@ class BootstrapApplication:
     def __init__(self) -> None:
         self.settings = BootstrapSettings.load()
         self.hwid = get_hwid()
-        self.state_store = BootstrapStateStore(self.settings.state_db_path, self.hwid)
+        self.legacy_hwid = get_legacy_hwid()
+        self.state_store = BootstrapStateStore(
+            self.settings.state_db_path,
+            self.hwid,
+            legacy_hwid=self.legacy_hwid,
+        )
         self.server_base_url = self.state_store.load_server_url(self.settings.default_server_base_url)
         self.channel = self.state_store.load_channel(self.settings.default_channel)
         self.license_client = LicenseClient(self.server_base_url)
@@ -78,6 +83,7 @@ class BootstrapApplication:
                     hwid=self.hwid,
                     channel=self.channel,
                     app=app,
+                    legacy_hwid=self.legacy_hwid,
                 )
                 if not response.get("valid"):
                     self.state_store.clear()
@@ -124,6 +130,7 @@ class BootstrapApplication:
                 context = {
                     "license_key": license_key,
                     "hwid": self.hwid,
+                    "legacy_hwid": self.legacy_hwid,
                     "server_base_url": self.server_base_url,
                     "server_salt": bootstrap_config.server_salt,
                     "legacy_base_dir": str(self.settings.legacy_base_dir),
