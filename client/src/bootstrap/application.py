@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import tkinter as tk
+from datetime import datetime
 from tkinter import messagebox
 
 import requests
@@ -17,6 +18,10 @@ from client.src.security.device import get_hwid, get_legacy_hwid
 from client.src.ui.connection_error_dialog import show_connection_error
 from client.src.ui.icon_resolver import get_verified_icon_path
 from client.src.ui.license_dialog import ask_app_choice, ask_license_key
+
+
+def _is_decrypt_failure(exc: BaseException) -> bool:
+    return "Failed to decrypt payload" in str(exc)
 
 
 class BootstrapApplication:
@@ -36,6 +41,33 @@ class BootstrapApplication:
         self.package_downloader = PackageDownloader(self.server_base_url)
         self.package_verifier = PackageVerifier()
         self.runtime_launcher = RuntimeLauncher()
+
+    def _backup_remove_runtime_db(self) -> bool:
+        db_path = self.settings.runtime_data_dir / "wishlist_secure.db"
+        if not db_path.exists():
+            return False
+        stamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        backup = db_path.with_name(f"{db_path.name}.bak.{stamp}")
+        db_path.rename(backup)
+        return True
+
+    def _launch_runtime(
+        self,
+        *,
+        runtime_zip: bytes,
+        module_name: str,
+        entrypoint: str,
+        context: dict,
+    ) -> None:
+        try:
+            self.runtime_launcher.launch(runtime_zip, module_name, entrypoint, context)
+        except Exception as exc:
+            if not _is_decrypt_failure(exc):
+                raise
+            if self._backup_remove_runtime_db():
+                self.runtime_launcher.launch(runtime_zip, module_name, entrypoint, context)
+                return
+            raise
 
     def run(self) -> None:
         cached_license_key = self.state_store.load_license_key()
@@ -125,6 +157,7 @@ class BootstrapApplication:
                     server_salt=manifest["server_salt"],
                     version=manifest["version"],
                     expected_sha256=manifest["package_sha256"],
+                    legacy_hwid=self.legacy_hwid,
                 )
 
                 context = {
@@ -138,11 +171,11 @@ class BootstrapApplication:
                     "icon_path": icon_path_str,
                     "app_version": manifest.get("version", ""),
                 }
-                self.runtime_launcher.launch(
-                    runtime_zip,
-                    manifest["module_name"],
-                    manifest["entrypoint"],
-                    context,
+                self._launch_runtime(
+                    runtime_zip=runtime_zip,
+                    module_name=manifest["module_name"],
+                    entrypoint=manifest["entrypoint"],
+                    context=context,
                 )
                 return
             except requests.exceptions.ConnectionError:

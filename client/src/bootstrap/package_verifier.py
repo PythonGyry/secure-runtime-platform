@@ -31,16 +31,32 @@ class PackageVerifier:
         server_salt: str,
         version: str,
         expected_sha256: str,
+        legacy_hwid: str | None = None,
     ) -> bytes:
         """Decrypt package to memory. No disk write."""
-        return unwrap_to_memory(
-            encrypted_b64=encrypted_package_b64,
-            license_key=license_key,
-            hwid=hwid,
-            server_salt=server_salt,
-            version=version,
-            expected_sha256=expected_sha256,
-        )
+        hwid_candidates = [hwid]
+        legacy = (legacy_hwid or "").strip()
+        if legacy and legacy not in hwid_candidates:
+            hwid_candidates.append(legacy)
+
+        last_error: Exception | None = None
+        for candidate in hwid_candidates:
+            try:
+                return unwrap_to_memory(
+                    encrypted_b64=encrypted_package_b64,
+                    license_key=license_key,
+                    hwid=candidate,
+                    server_salt=server_salt,
+                    version=version,
+                    expected_sha256=expected_sha256,
+                )
+            except (ValueError, RuntimeError) as exc:
+                last_error = exc
+                if "Failed to decrypt payload" not in str(exc) and "Integrity check failed" not in str(exc):
+                    raise
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Package decryption failed")
 
     def decrypt_and_extract(
         self,
