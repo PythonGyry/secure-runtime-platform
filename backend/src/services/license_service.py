@@ -19,6 +19,7 @@ class LicenseService:
         version_pins: dict[str, str] | None = None,
         expires_at: str | None = None,
         notes: str = "",
+        max_accounts: int | None = None,
     ) -> dict:
         if channel_access is None:
             channel_access = {}
@@ -34,6 +35,7 @@ class LicenseService:
             version_pins=version_pins or {},
             expires_at=expires_at,
             notes=notes,
+            max_accounts=max_accounts,
         )
 
     def list(self, *, status: str | None = None) -> list[dict]:
@@ -51,7 +53,11 @@ class LicenseService:
             return None
         allowed = self._parse_app_channel_access(record.get("channel_access"))
         apps = sorted(allowed.keys()) if allowed else []
-        return {"apps": apps, "valid": True}
+        return {
+            "apps": apps,
+            "valid": True,
+            "max_accounts": record.get("max_accounts"),
+        }
 
     def get(self, license_id: int) -> dict | None:
         return self.repository.get_managed_license_by_id(license_id)
@@ -94,6 +100,7 @@ class LicenseService:
             expires_at=record.get("expires_at"),
             notes=record.get("notes", ""),
             status=record.get("status", "active"),
+            max_accounts=record.get("max_accounts"),
         )
 
     def verify(

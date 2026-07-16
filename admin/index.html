@@ -88,6 +88,26 @@
                 </div>
               </div>
             </label>
+            <label class="form-field">
+              <span class="field-label">Макс. акаунтів</span>
+              <div class="max-accounts-field">
+                <select id="license-max-accounts-mode" class="field-input">
+                  <option value="unlimited" selected>∞ Безліміт</option>
+                  <option value="custom">Своя кількість</option>
+                </select>
+                <input
+                  type="number"
+                  id="license-max-accounts"
+                  class="field-input"
+                  min="1"
+                  step="1"
+                  placeholder="напр. 5"
+                  disabled
+                  style="display: none;"
+                />
+              </div>
+              <p class="muted" style="margin-top: 0.25rem;">Скільки акаунтів можна додати в wishlist по цій ліцензії. ∞ — без обмежень.</p>
+            </label>
           </div>
           <div class="form-row">
             <label class="form-field full-width">
@@ -124,6 +144,7 @@
               <th>Status</th>
               <th>App / Channels</th>
               <th>Версія</th>
+              <th>Акаунти</th>
               <th>Bound HWID</th>
               <th>Actions</th>
             </tr>

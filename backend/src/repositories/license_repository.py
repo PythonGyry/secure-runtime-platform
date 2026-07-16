@@ -66,6 +66,7 @@ class LicenseRepository:
         expires_at: str | None = None,
         notes: str = "",
         status: str = "active",
+        max_accounts: int | None = None,
     ) -> dict:
         now = datetime.utcnow().isoformat()
         if isinstance(channel_access, dict):
@@ -73,6 +74,14 @@ class LicenseRepository:
         else:
             channel_access_json = json.dumps(sorted(set(channel_access)) or ["stable"])
         version_pins_json = json.dumps(version_pins if isinstance(version_pins, dict) else {})
+        normalized_max = None
+        if max_accounts is not None:
+            try:
+                normalized_max = int(max_accounts)
+            except (TypeError, ValueError):
+                normalized_max = None
+            if normalized_max is not None and normalized_max < 1:
+                normalized_max = None
         payload = (
             license_key,
             hash_license_key(license_key),
@@ -85,6 +94,7 @@ class LicenseRepository:
             created_by,
             now,
             now,
+            normalized_max,
         )
         with self.database.connect() as connection:
             connection.execute(
@@ -100,9 +110,10 @@ class LicenseRepository:
                     notes,
                     created_by,
                     created_at,
-                    updated_at
+                    updated_at,
+                    max_accounts
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 payload,
             )
@@ -150,6 +161,16 @@ class LicenseRepository:
                     value = json.dumps(sorted(set(value)) or ["stable"])
             elif key == "version_pins" and isinstance(value, dict):
                 value = json.dumps(value)
+            elif key == "max_accounts":
+                if value is None:
+                    value = None
+                else:
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        value = None
+                    if value is not None and value < 1:
+                        value = None
             assignments.append(f"{key} = ?")
             params.append(value)
         assignments.append("updated_at = ?")
@@ -228,4 +249,13 @@ class LicenseRepository:
             payload["version_pins"] = json.loads(payload.get("version_pins", "{}"))
         except json.JSONDecodeError:
             payload["version_pins"] = {}
+        raw_max = payload.get("max_accounts")
+        if raw_max is None or raw_max == "":
+            payload["max_accounts"] = None
+        else:
+            try:
+                max_accounts = int(raw_max)
+                payload["max_accounts"] = max_accounts if max_accounts >= 1 else None
+            except (TypeError, ValueError):
+                payload["max_accounts"] = None
         return payload

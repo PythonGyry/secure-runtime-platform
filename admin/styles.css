@@ -362,6 +362,31 @@ td.license-version-cell {
   border-color: var(--accent, #3b82f6);
 }
 
+.max-accounts-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.max-accounts-field .field-input {
+  min-width: 140px;
+}
+td.license-max-accounts-cell {
+  min-width: 140px;
+  vertical-align: middle;
+}
+.max-accounts-inline {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+}
+.max-accounts-input {
+  width: 72px;
+  min-height: 36px;
+  padding: 4px 8px;
+}
+
 /* Dropdown */
 .dropdown {
   position: relative;

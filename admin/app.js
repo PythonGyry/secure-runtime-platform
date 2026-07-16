@@ -129,6 +129,56 @@ function buildVersionCellHTML(item) {
   return html;
 }
 
+function formatMaxAccounts(value) {
+  if (value === null || value === undefined || value === "") return "∞";
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 1 ? String(n) : "∞";
+}
+
+function buildMaxAccountsCellHTML(item) {
+  const cur = item.max_accounts;
+  const isUnlimited = cur === null || cur === undefined || cur === "";
+  const num = !isUnlimited && Number(cur) >= 1 ? Number(cur) : "";
+  return `
+    <div class="max-accounts-inline" data-license-id="${item.license_id}">
+      <select data-edit-max-accounts-mode class="version-pin-select">
+        <option value="unlimited" ${isUnlimited ? "selected" : ""}>∞</option>
+        <option value="custom" ${!isUnlimited ? "selected" : ""}>Ліміт</option>
+      </select>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        data-edit-max-accounts-value
+        class="field-input max-accounts-input"
+        value="${escapeAttr(num)}"
+        placeholder="N"
+        ${isUnlimited ? "disabled" : ""}
+        style="${isUnlimited ? "display:none;" : ""}"
+      />
+    </div>
+  `;
+}
+
+function getMaxAccountsFromCreateForm() {
+  const mode = document.getElementById("license-max-accounts-mode")?.value || "unlimited";
+  if (mode !== "custom") return null;
+  const raw = document.getElementById("license-max-accounts")?.value?.trim() || "";
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.floor(n);
+}
+
+function syncCreateMaxAccountsUi() {
+  const mode = document.getElementById("license-max-accounts-mode");
+  const input = document.getElementById("license-max-accounts");
+  if (!mode || !input) return;
+  const custom = mode.value === "custom";
+  input.disabled = !custom;
+  input.style.display = custom ? "" : "none";
+  if (!custom) input.value = "";
+}
+
 function renderLicenses(items) {
   const appFilter = state.licensesAppFilter || "";
   let filtered = items;
@@ -144,6 +194,7 @@ function renderLicenses(items) {
     ...item,
     caStr: formatChannelAccess(item.channel_access),
     versionPinsStr: formatVersionPins(item.version_pins),
+    maxAccountsStr: formatMaxAccounts(item.max_accounts),
   }));
   licensesTable.innerHTML = rows.map((item) => `
     <tr>
@@ -154,6 +205,9 @@ function renderLicenses(items) {
       <td>${item.caStr}</td>
       <td class="license-version-cell">
         ${buildVersionCellHTML(item)}
+      </td>
+      <td class="license-max-accounts-cell">
+        ${buildMaxAccountsCellHTML(item)}
       </td>
       <td>${item.bound_hwid || ""}</td>
       <td>
@@ -179,6 +233,7 @@ function renderLicenses(items) {
         <div class="card-row"><span class="card-label">Status</span><span class="card-value">${item.status}</span></div>
         <div class="card-row"><span class="card-label">Access</span><span class="card-value">${item.caStr}</span></div>
         <div class="card-row card-row-version"><span class="card-label">Версія</span><div class="card-value card-value-version">${buildVersionCellHTML(item)}</div></div>
+        <div class="card-row"><span class="card-label">Акаунти</span><div class="card-value">${buildMaxAccountsCellHTML(item)}</div></div>
         <div class="card-row"><span class="card-label">HWID</span><span class="card-value">${item.bound_hwid || "—"}</span></div>
         <div class="card-actions inline-actions">
           <button data-action="toggle-license" data-id="${item.license_id}" data-status="${item.status}">${item.status === "active" ? "Disable" : "Enable"}</button>
@@ -761,6 +816,20 @@ document.getElementById("license-form").addEventListener("submit", async (event)
     expires_at: expiresAt,
     notes: document.getElementById("license-notes").value.trim(),
   };
+  const maxMode = document.getElementById("license-max-accounts-mode")?.value || "unlimited";
+  if (maxMode === "custom") {
+    const n = getMaxAccountsFromCreateForm();
+    if (n === null) {
+      if (errEl) {
+        errEl.textContent = "Вкажіть кількість акаунтів (≥ 1) або оберіть ∞ Безліміт.";
+        errEl.style.display = "block";
+      }
+      return;
+    }
+    payload.max_accounts = n;
+  } else {
+    payload.max_accounts = null;
+  }
   await api("/api/admin/licenses", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -768,10 +837,15 @@ document.getElementById("license-form").addEventListener("submit", async (event)
   event.target.reset();
   document.getElementById("license-no-expiry").checked = true;
   document.getElementById("license-expires-at").disabled = true;
+  const maxModeReset = document.getElementById("license-max-accounts-mode");
+  if (maxModeReset) maxModeReset.value = "unlimited";
+  syncCreateMaxAccountsUi();
   updateAppVersionDropdown();
   await refreshAll();
 });
 
+document.getElementById("license-max-accounts-mode")?.addEventListener("change", syncCreateMaxAccountsUi);
+syncCreateMaxAccountsUi();
 initAppVersionDropdown();
 initLicensesAppDropdown();
 initKeysStatusDropdown();
@@ -837,7 +911,54 @@ document.body.addEventListener("change", async (event) => {
       body: JSON.stringify({ version_pins: versionPins }),
     });
     await refreshAll();
+    return;
   }
+  if (select.matches && select.matches("select[data-edit-max-accounts-mode]")) {
+    const wrapper = select.closest(".max-accounts-inline[data-license-id]");
+    if (!wrapper) return;
+    const input = wrapper.querySelector("input[data-edit-max-accounts-value]");
+    const licenseId = wrapper.dataset.licenseId;
+    if (!licenseId) return;
+    if (select.value === "unlimited") {
+      if (input) {
+        input.value = "";
+        input.disabled = true;
+        input.style.display = "none";
+      }
+      await api(`/api/admin/licenses/${licenseId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ max_accounts: null }),
+      });
+      await refreshAll();
+      return;
+    }
+    if (input) {
+      input.disabled = false;
+      input.style.display = "";
+      if (!input.value) input.focus();
+    }
+  }
+});
+
+document.body.addEventListener("change", async (event) => {
+  const input = event.target;
+  if (!(input.matches && input.matches("input[data-edit-max-accounts-value]"))) return;
+  const wrapper = input.closest(".max-accounts-inline[data-license-id]");
+  if (!wrapper) return;
+  const licenseId = wrapper.dataset.licenseId;
+  if (!licenseId) return;
+  const mode = wrapper.querySelector("select[data-edit-max-accounts-mode]")?.value;
+  if (mode !== "custom") return;
+  const n = Number(input.value);
+  if (!Number.isFinite(n) || n < 1) {
+    input.focus();
+    return;
+  }
+  await api(`/api/admin/licenses/${licenseId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ max_accounts: Math.floor(n) }),
+  });
+  await refreshAll();
 });
 
 document.body.addEventListener("click", async (event) => {

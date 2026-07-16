@@ -170,6 +170,7 @@ class BootstrapApplication:
                     "runtime_data_dir": str(self.settings.runtime_data_dir),
                     "icon_path": icon_path_str,
                     "app_version": manifest.get("version", ""),
+                    "max_accounts": response.get("max_accounts"),
                 }
                 self._launch_runtime(
                     runtime_zip=runtime_zip,

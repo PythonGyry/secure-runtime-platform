@@ -152,6 +152,7 @@ class Database:
             )
             self._seed_server_config(connection)
             self._migrate_managed_licenses_version_pins(connection)
+            self._migrate_managed_licenses_max_accounts(connection)
             connection.commit()
 
     def _migrate_managed_licenses_version_pins(self, connection: sqlite3.Connection) -> None:
@@ -160,6 +161,14 @@ class Database:
         if "version_pins" in columns:
             return
         connection.execute("ALTER TABLE managed_licenses ADD COLUMN version_pins TEXT NOT NULL DEFAULT '{}'")
+
+    def _migrate_managed_licenses_max_accounts(self, connection: sqlite3.Connection) -> None:
+        """NULL = безліміт (∞). Старі ліцензії без колонки отримують NULL."""
+        cursor = connection.execute("PRAGMA table_info(managed_licenses)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "max_accounts" in columns:
+            return
+        connection.execute("ALTER TABLE managed_licenses ADD COLUMN max_accounts INTEGER")
 
     def _migrate_download_tokens_add_app(self, connection: sqlite3.Connection) -> None:
         cursor = connection.execute("PRAGMA table_info(managed_download_tokens)")

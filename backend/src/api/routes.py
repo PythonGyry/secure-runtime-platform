@@ -52,6 +52,7 @@ class AdminLicenseCreateBody(BaseModel):
     version_pins: dict[str, str] | None = None  # {"wishlist": "1.0.5"} — яку версію грузити; якщо нема — найновіша
     expires_at: str | None = None
     notes: str = ""
+    max_accounts: int | None = None  # None / omitted = ∞ (безліміт)
 
 
 class AdminLicenseUpdateBody(BaseModel):
@@ -61,6 +62,7 @@ class AdminLicenseUpdateBody(BaseModel):
     expires_at: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    max_accounts: Optional[int] = None  # явно null = ∞
 
 
 class AdminReleaseStatusBody(BaseModel):
@@ -173,6 +175,7 @@ def build_router(container) -> APIRouter:
             "signature": signature,
             "download_token": download_token,
             "icon_url": icon_url,
+            "max_accounts": (license_record or {}).get("max_accounts"),
         }
 
     @public_router.post("/runtime/download")
@@ -292,6 +295,7 @@ def build_router(container) -> APIRouter:
             version_pins=body.version_pins or {},
             expires_at=body.expires_at,
             notes=body.notes,
+            max_accounts=body.max_accounts,
         )
         container.admin_repository.record_audit(session["username"], "license.create", {"license_id": record["license_id"]})
         return record
@@ -303,7 +307,13 @@ def build_router(container) -> APIRouter:
         authorization: str | None = Header(default=None),
     ) -> dict:
         session = _require_admin(container, authorization)
-        changes = {key: value for key, value in (body.model_dump() if hasattr(body, "model_dump") else body.dict()).items() if value is not None}
+        raw = body.model_dump(exclude_unset=True) if hasattr(body, "model_dump") else body.dict(exclude_unset=True)
+        changes: dict = {}
+        for key, value in raw.items():
+            if key == "max_accounts":
+                changes[key] = value  # дозволяє явно поставити null (= ∞)
+            elif value is not None:
+                changes[key] = value
         record = container.license_service.update(license_id, **changes)
         if not record:
             raise HTTPException(status_code=404, detail="License not found")
