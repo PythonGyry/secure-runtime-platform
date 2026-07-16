@@ -3,6 +3,7 @@ Rate limiting and brute-force protection.
 
 - license/check: 15 req/min per IP, 3s delay on failed check
 - license/info: 30 req/min per IP
+- license/rebind: 8 req/min per IP, 3s delay on failed rebind
 - admin/login: 5 req/min per IP, 5s delay on failed login
 
 Custom implementation (no SlowAPI) to avoid 422 body parsing issues.
@@ -30,6 +31,7 @@ _store_lock = threading.Lock()
 _LIMITS: dict[str, tuple[int, int]] = {
     "license/info": (30, 60),
     "license/check": (15, 60),
+    "license/rebind": (8, 60),
     "admin/login": (5, 60),
 }
 

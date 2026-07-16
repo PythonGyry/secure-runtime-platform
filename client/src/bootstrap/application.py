@@ -73,13 +73,22 @@ class BootstrapApplication:
         cached_license_key = self.state_store.load_license_key()
         license_key = cached_license_key
         status_message = ""
+        status_error_code = ""
+        bound_device = ""
+        last_attempt_key = ""
         while True:
             if not license_key:
                 license_key = ask_license_key(
                     status_message=status_message,
+                    status_error_code=status_error_code,
+                    bound_device=bound_device,
+                    initial_key=last_attempt_key,
                     license_client=self.license_client,
+                    hwid=self.hwid,
                 )
                 status_message = ""
+                status_error_code = ""
+                bound_device = ""
             if not license_key:
                 return
 
@@ -90,6 +99,7 @@ class BootstrapApplication:
                 self.channel = self.state_store.load_channel(bootstrap_config.default_channel)
 
                 license_key = license_key.strip()
+                last_attempt_key = license_key
                 # Яку апку завантажувати: фіксована при збірці (-a), одна з ліцензії, або вибір кнопками
                 app = "wishlist"
                 try:
@@ -106,6 +116,8 @@ class BootstrapApplication:
                     chosen = ask_app_choice(allowed_apps)
                     if chosen is None:
                         status_message = ""
+                        status_error_code = ""
+                        bound_device = ""
                         continue
                     app = chosen
                 elif allowed_apps:
@@ -119,9 +131,11 @@ class BootstrapApplication:
                 )
                 if not response.get("valid"):
                     self.state_store.clear()
+                    status_message = response.get("message", "Невірний або заблокований ліцензійний ключ.")
+                    status_error_code = str(response.get("error_code") or "")
+                    bound_device = str(response.get("bound_device") or "")
                     license_key = None
                     cached_license_key = None
-                    status_message = response.get("message", "Невірний або заблокований ліцензійний ключ.")
                     continue
 
                 self.state_store.save_license_key(license_key)

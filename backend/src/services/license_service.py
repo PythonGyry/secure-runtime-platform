@@ -5,10 +5,19 @@ from datetime import datetime
 
 from backend.src.repositories.license_repository import LicenseRepository
 
+# Текст для користувача (без технічних деталей / адмінки)
+_SUPPORT_TG = "Напишіть у Telegram @inceglist (https://t.me/inceglist)"
+
 
 class LicenseService:
     def __init__(self, repository: LicenseRepository) -> None:
         self.repository = repository
+
+    @staticmethod
+    def _msg(text: str, *, with_support: bool = False) -> str:
+        if with_support:
+            return f"{text} {_SUPPORT_TG}."
+        return text
 
     def create(
         self,
@@ -74,6 +83,40 @@ class LicenseService:
     def unbind_hwid(self, license_id: int) -> dict | None:
         return self.repository.update_managed_license(license_id, bound_hwid=None)
 
+    def rebind_to_device(self, license_key: str, hwid: str) -> tuple[bool, str, dict | None]:
+        """Відв'язати попередній пристрій і прив'язати ліцензію до поточного HWID."""
+        key = (license_key or "").strip()
+        device = (hwid or "").strip()
+        if not key:
+            return False, "Введіть ліцензійний ключ", None
+        if not device:
+            return False, "Не вдалося визначити пристрій", None
+
+        record = self.repository.get_managed_license(key)
+        if not record:
+            legacy_record = self.repository.get_license(key)
+            if legacy_record:
+                return False, self._msg("Цей ключ більше не підтримується.", with_support=True), None
+            return False, self._msg("Ліцензію не знайдено. Перевірте ключ.", with_support=True), None
+
+        if record["status"] != "active":
+            return False, self._msg("Ліцензію вимкнено.", with_support=True), None
+
+        expires_at = record.get("expires_at")
+        if expires_at and expires_at < datetime.utcnow().isoformat():
+            return False, self._msg("Термін дії ліцензії закінчився.", with_support=True), None
+
+        bound_hwid = (record.get("bound_hwid") or "").strip() or None
+        if bound_hwid == device:
+            return True, "Ліцензію вже прив'язано до цього пристрою", record
+
+        record = self.repository.update_managed_license(
+            record["license_id"],
+            bound_hwid=device,
+            last_used_at=datetime.utcnow().isoformat(),
+        )
+        return True, "Пристрій оновлено. Ліцензію прив'язано до цього ПК", record
+
     def update(self, license_id: int, **changes: object) -> dict | None:
         return self.repository.update_managed_license(license_id, **changes)
 
@@ -116,20 +159,20 @@ class LicenseService:
         if not record:
             legacy_record = self.repository.get_license(license_key)
             if legacy_record:
-                return False, "Legacy license records must be recreated in the admin panel", None
-            return False, "License not found", None
+                return False, self._msg("Цей ключ більше не підтримується.", with_support=True), None
+            return False, self._msg("Ліцензію не знайдено. Перевірте ключ.", with_support=True), None
 
         if record["status"] != "active":
-            return False, "License is disabled", None
+            return False, self._msg("Ліцензію вимкнено.", with_support=True), None
 
         expires_at = record.get("expires_at")
         if expires_at and expires_at < datetime.utcnow().isoformat():
-            return False, "License has expired", None
+            return False, self._msg("Термін дії ліцензії закінчився.", with_support=True), None
 
         allowed = self._parse_app_channel_access(record.get("channel_access"))
         app_channels = allowed.get(app, [])
         if app_channels and channel not in app_channels:
-            return False, f"App '{app}' / channel '{channel}' is not allowed for this license", None
+            return False, self._msg("Немає доступу до цієї програми за вашим ключем.", with_support=True), None
 
         bound_hwid = record.get("bound_hwid")
         legacy = (legacy_hwid or "").strip() or None
@@ -141,7 +184,12 @@ class LicenseService:
                     last_used_at=datetime.utcnow().isoformat(),
                 )
             else:
-                return False, "License is already bound to another device", None
+                # Хто ввів валідний ключ — отримує місце на цьому ПК (без нового .exe)
+                record = self.repository.update_managed_license(
+                    record["license_id"],
+                    bound_hwid=hwid,
+                    last_used_at=datetime.utcnow().isoformat(),
+                )
         elif not bound_hwid:
             record = self.repository.update_managed_license(
                 record["license_id"],
@@ -154,7 +202,7 @@ class LicenseService:
                 last_used_at=datetime.utcnow().isoformat(),
             )
 
-        return True, "License is valid", record
+        return True, "Ліцензія дійсна", record
 
     def _parse_app_channel_access(self, raw: str | list | dict | None) -> dict[str, list[str]]:
         """Parse channel_access: list -> {wishlist: list}, dict -> as is."""

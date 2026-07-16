@@ -73,3 +73,17 @@ class LicenseClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def rebind_license(self, license_key: str, hwid: str) -> Dict[str, Any]:
+        """Відв'язати попередній пристрій і прив'язати ключ до поточного HWID."""
+        response = _request_with_retry(
+            "POST",
+            f"{self.server_base_url}/api/v1/license/rebind",
+            json={
+                "license_key": (license_key or "").strip(),
+                "hwid": (hwid or "").strip(),
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        return response.json()

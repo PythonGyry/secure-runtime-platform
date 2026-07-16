@@ -26,6 +26,11 @@ class LicenseInfoBody(BaseModel):
     license_key: str
 
 
+class LicenseRebindBody(BaseModel):
+    license_key: str
+    hwid: str
+
+
 class DownloadBody(BaseModel):
     download_token: str
 
@@ -114,6 +119,25 @@ def build_router(container) -> APIRouter:
         if not info:
             return {"valid": False, "apps": []}
         return info
+
+    @public_router.post("/license/rebind")
+    async def license_rebind(
+        body: LicenseRebindBody,
+        _: None = Depends(rate_limit_dep("license/rebind")),
+    ) -> dict:
+        """Відв'язати попередній пристрій і прив'язати ліцензію до поточного."""
+        ok, message, record = container.license_service.rebind_to_device(
+            (body.license_key or "").strip(),
+            (body.hwid or "").strip(),
+        )
+        if not ok:
+            await asyncio.sleep(LICENSE_CHECK_FAIL_DELAY)
+            return {"ok": False, "message": message}
+        return {
+            "ok": True,
+            "message": message,
+            "license_id": (record or {}).get("license_id"),
+        }
 
     @public_router.post("/license/check")
     async def license_check(
